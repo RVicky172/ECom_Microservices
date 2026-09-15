@@ -1,0 +1,729 @@
+﻿
+Real-World E-Commerce
+Microservices Architecture
+HLD, LLD, React Frontend, Docker/Kubernetes, Kafka, AWS, CI/CD & Payment Idempotency ΓÇö Architecture Review Edition
+A Complete, End-to-End System Design Walkthrough for a Node.js + React E-Commerce Platform
+
+Prepared by: Vicky Kumar
+
+
+Topics: HLD ┬╖ LLD ┬╖ React State Management ┬╖ Cart Service ┬╖ Docker/Kubernetes ┬╖ Kafka ┬╖ Database Design ┬╖ AWS ┬╖ CI/CD ┬╖ Payment Idempotency ┬╖ Refunds & Reconciliation ┬╖ Observability
+
+Contents
+Part I ΓÇö Requirements & Architecture
+1. Executive Summary
+1.1 Architecture Review ΓÇö Priority Improvements
+2. High-Level Design (HLD) ΓÇö includes Functional & Non-Functional Requirements
+3. Low-Level Design (LLD) ΓÇö Order Service
+4. Frontend Architecture ΓÇö React Application
+5. Monolith vs. Microservices
+6. Decomposing a System (Domain-Driven Design)
+Part II ΓÇö Communication & Data
+7. Service Communication: Synchronous & Asynchronous
+8. Apache Kafka Deep Dive
+9. Database Design, Optimization & Selection Rationale
+10. Error Handling & Cascading Failure Prevention
+11. Idempotency Deep Dive: Payment APIs
+Part III ΓÇö Infrastructure & Deployment
+12. Docker & Kubernetes: How They Fit
+13. AWS Services Mapping & Deployment Architecture
+14. CI/CD Pipeline
+Part IV ΓÇö Operations & Quality
+15. Logging & Monitoring in Production
+16. Production Directory Structure
+17. Step-by-Step Code Walkthrough
+18. Putting It All Together: End-to-End Flow
+19. System-Wide Edge Cases
+20. Common Pitfalls in Production Systems
+21. Key Takeaways & Production Readiness
+Part V ΓÇö Appendices
+Appendix A: Architecture Decision Records (ADRs)
+Appendix B: Capacity Planning & Traffic Estimation
+Appendix C: Threat Model (STRIDE) for Checkout & Payment
+Appendix D: Security Architecture ΓÇö Defense in Depth
+Appendix E: Distributed Systems Concepts Reference
+1. Executive Summary
+This document is a full system-design pass over an e-commerce platform, presented the way it would be reviewed in a real engineering organization: first the High-Level Design (HLD) ΓÇö the big picture of services, data flow, and infrastructure ΓÇö then the Low-Level Design (LLD) ΓÇö the internal structure of one service in enough detail to actually implement it. Around that core, this guide covers the operational concerns that separate a toy demo from a production system: how Docker and Kubernetes package and run the services, how Apache Kafka moves events between them reliably at scale, how each service's database is modelled, and how the system is observed once it's live (logging, metrics, tracing, alerting).
+1.1 Architecture Principles
+
+One service owns each business capability and its data; other services integrate through APIs and domain events, never direct database access.
+Checkout follows one canonical Saga: Order ΓåÆ Inventory Reservation ΓåÆ Payment ΓåÆ Order Confirmation ΓåÆ Fulfillment ΓåÆ Notification, with durable compensation and reconciliation.
+Critical mutations are idempotent, database-to-event publication uses an outbox, and important consumers use inbox/deduplication.
+Production readiness is measured through SLOs, business signals, capacity assumptions, security controls, tested recovery and safe deployment automation.
+≡ƒÆí Convention used throughout: solid arrows in diagrams represent synchronous (request/response) calls; dashed arrows represent asynchronous, event-driven communication through Kafka; dotted arrows represent telemetry (metrics/logs) flowing to the observability stack.
+2. High-Level Design (HLD)
+High-Level Design answers one question: "What are the major moving parts, and how do they fit together?" It deliberately stays away from class names or SQL columns ΓÇö that's LLD's job (Section 3). HLD is what you'd sketch on a whiteboard in a design-review meeting.
+2.1 Functional Requirements
+Functional requirements describe WHAT the system must let a shopper, and the business, actually do ΓÇö independent of how it's built. Everything else in this document exists to satisfy this list under the constraints in Section 2.2.
+≡ƒÆí FR-9 and FR-10 are easy to overlook because no shopper explicitly "asks" for them, but they are functional requirements in the same sense as FR-4 ΓÇö the system either behaves correctly under retries and redeploys, or it doesn't. Treating them as functional (not just "nice-to-have" reliability work) is why Sections 3.4, 10, and 11 exist at all.
+2.2 Non-Functional Requirements
+Non-functional requirements describe HOW WELL the system must do the above ΓÇö the quality attributes and constraints that shape every architectural decision in the rest of this document, even though a shopper never sees them directly.
+≡ƒÆí Every NFR above maps to a specific mechanism described later, rather than being an aspiration: Availability ΓåÆ Section 10's circuit breakers and Section 12.6's PodDisruptionBudgets; Scalability ΓåÆ Section 12.2's HPA; Consistency ΓåÆ Section 9.5's Saga pattern; and so on. If a future requirement can't be traced to a concrete mechanism this way, that's a sign the design doesn't actually satisfy it yet.
+2.3 Services in the System
+The platform is decomposed into seven business services plus an API Gateway. Cart is an explicit capability because cart persistence, guest-cart merging and checkout preparation have their own lifecycle and consistency rules.
+
+
+2.4 System Architecture Diagram
+The diagram below is the single most important artifact in this document ΓÇö every later section zooms into one piece of it.
+
+Figure 1 ΓÇö High-level architecture: client traffic, Kubernetes-hosted services, per-service databases, the Kafka event backbone, and the observability stack.
+2.5 Reading the Diagram: Two Kinds of Traffic
+Notice the two distinct paths through the system:
+Solid arrows (synchronous): the client's request path ΓÇö Client ΓåÆ CDN ΓåÆ Ingress/Gateway ΓåÆ a service ΓåÆ its database ΓåÆ response. This path must be fast because a human is waiting.
+Dashed arrows (asynchronous): the event path ΓÇö a service publishes to Kafka, and any number of other services consume independently, on their own schedule. Nothing on this path blocks the original client request.
+Section 7 explains why this split exists, and Section 18 walks through one complete order from the moment a client clicks "Buy" to the confirmation email being sent, referencing exactly these two paths.
+
+3. Low-Level Design (LLD) ΓÇö Order Service
+If HLD is the map, LLD is the street-level view of one building. We zoom into the Order Service ΓÇö the most business-critical service ΓÇö and design it down to layers, classes/modules, and the database transaction boundary.
+3.1 Internal Architecture Diagram
+
+Figure 2 ΓÇö Order Service internals: one HTTP request flows top-to-bottom through middleware, controller, validation, business logic, and out to both the database and Kafka.
+
+3.2 Layer Responsibilities
+
+
+3.3 Order State Machine
+The Order Service's core business rule is a state machine ΓÇö an order can only move forward through specific, valid transitions. Modeling this explicitly (rather than as a loose status string anyone can overwrite) prevents invalid states like a "shipped" order silently reverting to "pending."
+3.4 Concurrency Control: What Happens When Requests Collide
+This is one of the most common real-world questions, and the state machine in Section 3.3 doesn't answer it by itself: what actually happens when two requests hit the system at almost the same instant? There are two distinct scenarios, and this system handles them with two different techniques.
+Scenario A: Two different shoppers buy the last unit of a product
+Shopper A and Shopper B both click "Buy" on the last remaining unit within milliseconds of each other. Both requests reach separate pods of the Inventory Service (Figure 5) at nearly the same time.
+The naive, broken approach reads the quantity, checks it in application code, then writes:
+
+The fix is to never let application code decide based on a value it read a moment ago ΓÇö push the check INTO the same atomic SQL statement as the write, so the database's own row lock does the deciding:
+Whichever request's UPDATE reaches Postgres first acquires a row lock on that stock_levels row; the second request's UPDATE simply waits until the first transaction commits, then re-evaluates quantity >= 1 against the now-updated value and correctly fails with rowCount = 0. Nothing in the application code has to know locking happened ΓÇö the database guarantees it.
+Scenario B: The same shopper's checkout click fires twice
+A slow network causes the browser to retry, or the shopper double-clicks "Place Order" before the button visually disables. This is NOT a stock race ΓÇö it's a duplicate-request problem, and it's solved differently: by the Idempotency-Key pattern (Section 11), not by database locking. The frontend (Section 4.5) generates one key per checkout attempt and sends the same key on both the original click and any retry, so the Order Service's idempotency check (Section 11.1) short-circuits the second request and returns the first request's result instead of creating a second order.
+≡ƒÆí Rule of thumb used throughout this design: races between DIFFERENT requests for the SAME resource (two shoppers, one stock row) are solved with atomic SQL / row locks. Duplicate delivery of the SAME logical request (retries, double-clicks, at-least-once Kafka redelivery) is solved with idempotency keys. They look similar but need different fixes ΓÇö using idempotency keys alone would not stop two different shoppers from oversubscribing stock, and using row locks alone would not stop a single retried request from creating two orders.
+
+Locking Strategies Used in This System
+≡ƒÆí Postgres's default isolation level (READ COMMITTED) is sufficient for all three techniques above because each relies on row-level locking or a version check rather than on transaction-level snapshot guarantees. SERIALIZABLE isolation is deliberately avoided for hot paths like checkout ΓÇö it prevents anomalies none of these flows are exposed to, while adding serialization-failure retries the team would otherwise not need to handle.
+3.5 Sample API Contract
+A concrete REST contract for creating an order ΓÇö this is what the Gateway proxies through to the Order Service's controller.
+A clear request/response contract like this is what LLD should produce ΓÇö precise enough that a frontend and backend engineer can build against it independently.
+
+3.6 API Versioning Strategy
+The contract in Section 3.5 will change over time ΓÇö a new required field, a renamed key, a different validation rule. Without a versioning strategy, changing it breaks every client that hasn't updated yet, including the mobile app version still installed on shoppers' phones from six months ago.
+Backward-compatible changes (adding an optional field, adding a new enum value a client can ignore) ship into the CURRENT version ΓÇö no version bump needed.
+Breaking changes (removing a field, changing a field's type, changing required-ness) ship as a new version, with the old version kept running until client adoption data (tracked via the API Gateway's access logs) shows the old version's traffic has dropped to zero.
+A deprecation is announced via a Deprecation and Sunset HTTP response header on the old version, giving consumers (including the team's own frontend, Section 4) a machine-readable countdown rather than an email that gets missed.
+≡ƒÆí This system's Gateway routes /api/v1/* and /api/v2/* to different Kubernetes Service names (order-service-v1, order-service-v2), so both versions can run as separate Deployments and be scaled/rolled back independently during a migration window.
+
+4. Frontend Architecture ΓÇö React Application
+The backend sections above assume a client exists that calls the Gateway. This section designs that client: a React + TypeScript single-page app, with the same rigor applied to state management, error handling, and resilience as the backend services.
+4.1 Architecture Diagram
+
+Figure 6 ΓÇö Two deliberately separate state layers (server-cache vs. client/UI state) feeding a shared API layer, plus a realtime channel for order-status pushes.
+
+4.2 State Management: Two Kinds of State, Two Tools
+The most common React architecture mistake is treating all state the same way ΓÇö putting server data (products, order status) into the same Redux store as pure UI state (is the cart drawer open). They have different lifecycles and different problems, so this design uses two separate tools:
+≡ƒÆí Why not just Redux Toolkit for everything? RTK Query (Redux's own data-fetching layer) is a perfectly valid alternative to TanStack Query and solves the same caching problem. The two-layer split (server cache vs. client state) is the important decision; which specific library implements each layer is a secondary choice.
+4.3 Example: Add-to-Cart with Optimistic Update
+A concrete pattern that shows both layers cooperating: updating the cart should feel instant (optimistic UI), but must roll back cleanly if the server rejects it (e.g., item went out of stock between page load and click).
+
+What to notice
+onMutate updates the UI before the network call resolves ΓÇö the shopper never sees a loading spinner for a simple cart add.
+onError explicitly reverses the optimistic change ΓÇö without this, a failed request silently leaves stale data on screen.
+onSettled always re-syncs with the server afterward, so any drift between optimistic guess and server truth self-corrects.
+4.4 Realtime Order Status
+Once checkout is placed, the order moves through the state machine in Section 3.3 asynchronously (payment, inventory, shipping) ΓÇö the page shouldn't need a manual refresh to see "Payment confirmed." A lightweight WebSocket (or Server-Sent Events) connection, fed by the backend's Kafka consumers, pushes status changes to the client, which simply invalidates the relevant TanStack Query cache entry so the UI re-fetches and re-renders.
+4.5 Frontend Error Handling & Resilience
+4.6 Authentication Storage & Browser Security
+The frontend should treat the access token as short-lived and avoid persisting long-lived refresh tokens in localStorage. A safer browser model is an HttpOnly, Secure, SameSite refresh-token cookie, rotation on refresh, server-side revocation for suspicious sessions, and CSRF protection where cookie-authenticated requests are used.
+The API client should never accept a client-calculated total as authoritative. Checkout sends item IDs and quantities; the backend derives price, discounts, taxes, shipping and final amount from server-owned data.
+Network errors: TanStack Query's built-in retry (with backoff) handles transient failures automatically; a global error boundary catches anything unrecoverable and shows a friendly fallback instead of a blank screen.
+Stale cache after payment: cap cache time (staleTime) tightly for anything price-related, and explicitly invalidate the product cache when a price-change event is pushed, so a shopper never checks out at a stale price.
+Offline / flaky connections: mutations (like "place order") are guarded against double-submission by disabling the submit button on isPending and by the idempotency key described in Section 11 ΓÇö the frontend generates the key once per checkout attempt and reuses it on retry.
+Race conditions: rapid quantity changes in the cart use TanStack Query's request cancellation (AbortController) so an old, slow response can't overwrite a newer one.
+
+5. Monolith vs. Microservices: When & Why
+
+≡ƒÆí Rule of thumb: most successful microservice systems started as well-organized monoliths and split only when specific services needed independent scaling, deployment cadence, or ownership. Splitting too early pays the distributed-systems tax with none of the payoff.
+6. Decomposing a System: Domain-Driven Design Basics
+6.1 Single Responsibility Principle (SRP)
+A service should represent one business capability. If a service does two unrelated jobs (handling payments AND sending marketing emails), that's a signal it should be two services.
+6.2 Bounded Context
+The same real-world concept can mean different things in different services:
+In Auth: a "User" holds a password hash, roles, and login history.
+In Order: a "User" holds shipping addresses and order history.
+Each service owns its own model shaped around what IT needs ΓÇö no shared "User" library across services.
+≡ƒÆí Pitfall: a shared "models" package imported by every service quietly rebuilds a monolith, coupling every service to that package's release schedule.
+
+7. Service Communication: Synchronous & Asynchronous
+7.1 Synchronous (REST / gRPC)
+Analogy: a phone call ΓÇö the caller waits for an answer. Used when an immediate response is required, e.g. a client fetching product details to render a page.
+Production hardening for synchronous calls:
+Timeouts on every outgoing call ΓÇö never wait forever.
+Retries with exponential backoff + jitter for transient failures only (not for 4xx client errors).
+Circuit breakers (Section 10) to fail fast once a dependency is clearly unhealthy.
+7.2 Asynchronous (Event-Driven via Kafka)
+Analogy: posting a notice on a public bulletin board ΓÇö the sender doesn't wait for, or even know, who reads it. The Order Service publishes an order.created event; Payment, Inventory, and Notification each consume it independently.
+Production hardening for asynchronous consumers:
+Idempotency: processing the same event twice (redelivery is normal) must not double-charge a card or double-send an email.
+Dead-letter topics: events that repeatedly fail processing are moved aside for manual inspection instead of blocking the partition forever.
+7.3 Choosing Between Them
+
+
+7.4 Kafka vs. RabbitMQ ΓÇö Picking a Broker
+
+
+8. Apache Kafka Deep Dive
+Kafka is the event backbone in Figure 1 ΓÇö the shared "nervous system" that lets Order, Payment, Inventory, and Notification react to each other without ever calling one another directly.
+8.1 Why Kafka for This System
+Throughput: an e-commerce platform during a sale can generate thousands of order events per second ΓÇö Kafka is built for this scale.
+Replay: if the Notification Service ships a bug, it can be fixed and re-run from an earlier offset to resend missed notifications ΓÇö impossible with a queue that deletes messages after delivery.
+Multiple independent consumers: new services (e.g., a future Analytics Service) can subscribe to order.created without the Order Service changing at all.
+8.2 Core Concepts
+
+
+
+
+
+
+
+8.3 Topic, Partition & Consumer Group Layout
+
+Figure 3 ΓÇö order.created has 3 partitions; the Payment, Notification, and Inventory services each consume it independently via their own consumer group, so all three groups see every event.
+8.4 Producer Example (kafkajs)
+What to notice
+ΓÇó idempotent: true enables Kafka producer idempotence, preventing duplicate producer records caused by producer retries. This is not end-to-end exactly-once processing; external side effects still require idempotency and reconciliation.
+ΓÇó key: order.id preserves ordering for events for the same order when those events are published to the same Kafka topic with the same partitioning scheme.
+The correlation ID travels as a Kafka header, so it can be picked up by the consumer's logger too (Section 15.2).
+8.5 Consumer Example (kafkajs)
+≡ƒÆí hasNotificationBeenSent()/markNotificationSent() is the idempotency check mentioned in Section 7.2 ΓÇö with Kafka's default "at-least-once" delivery, redelivery WILL happen occasionally, so this check is not optional in a production consumer.
+8.6 Schema Registry & Event Evolution
+The Kafka examples above serialize events as plain JSON, which works but has no guardrail: nothing stops the Order Service from renaming a field and silently breaking every consumer that reads it. A schema registry (Confluent Schema Registry, or AWS Glue Schema Registry when using MSK) adds that guardrail.
+Every event schema (e.g., OrderCreated v1) is registered centrally as an Avro or Protobuf schema, and the registry enforces a compatibility mode ΓÇö this system uses BACKWARD compatibility, meaning a new schema version must still be readable by consumers built against the previous version.
+Allowed under BACKWARD compatibility: adding a new optional field with a default value. Rejected by the registry at publish time: removing a field, renaming a field, or changing a field's type ΓÇö the producer's deploy fails fast in CI rather than silently breaking Notification Service in production three services away.
+Each message carries a small schema ID instead of the full schema, so the wire format stays compact ΓÇö consumers fetch the schema definition from the registry (and cache it) the first time they see a new schema ID.
+≡ƒÆí Why not just JSON with a versioned event type field (as shown in Section 8.4's code)? That approach is simpler to start with and is what a small team should reach for first ΓÇö it's what this guide's code examples use for readability. A schema registry earns its operational overhead once enough independent teams/services produce and consume events that a human-reviewed convention is no longer enough to prevent accidental breaking changes.
+
+8.7 Consumer Rebalancing & Delivery Semantics in Practice
+Section 8.2 introduced consumer groups; this is what actually happens operationally when a consumer group's membership changes ΓÇö e.g., during a rolling deployment of the Payment Service (Section 12.4).
+A new Payment Service pod starts up and joins the payment-service-group consumer group.
+Kafka's group coordinator triggers a rebalance: partition ownership is reassigned across all group members (including the new pod), which briefly pauses consumption for the whole group.
+Each consumer resumes reading from its newly assigned partition(s) starting at the last COMMITTED offset for that partition ΓÇö not from wherever the previous owner happened to be mid-processing.
+If the previous owner had read a message but not yet finished processing it when the rebalance happened, that message gets redelivered to whichever consumer now owns the partition ΓÇö this is precisely the at-least-once redelivery case Section 8.5's idempotency check exists for.
+This is also why this system deliberately does NOT rely on Kafka's exactly-once semantics (EOS) transactions for the order/payment/inventory event flow, even though Kafka supports them: EOS guarantees exactly-once processing WITHIN Kafka (producer to topic to consumer offset commit), but the moment a consumer's side effect leaves Kafka's transaction boundary ΓÇö charging a card via Stripe, sending an email ΓÇö EOS can no longer cover it. The idempotency-key pattern (Section 11) is the mechanism that actually has to hold at that boundary regardless, so this system invests there rather than in Kafka-level EOS configuration, which would add operational complexity without removing the need for Section 11's checks.
+
+9. Database Design, Optimization & Selection Rationale
+Section 6 established the rule: one database per service, never shared. This section makes that concrete with an actual schema, explains WHY each service picked its specific database technology, and covers the optimization techniques a real deployment needs at scale.
+9.1 Database Selection Rationale
+Every choice below trades something away ΓÇö the goal is picking the right trade-off per service, not one database for the whole system.
+9.2 Order Service ΓÇö Entity Relationship Diagram
+
+Figure 4 ΓÇö orders and order_items are written in one transaction alongside outbox_events, solving the dual-write problem described below.
+9.3 The Dual-Write Problem & the Outbox Pattern
+A subtle bug many teams hit: the Order Service saves the order to Postgres, THEN calls Kafka to publish order.created. What if the process crashes between those two steps? The order exists in the database, but the event was never published ΓÇö Payment and Inventory never find out.
+The transactional outbox pattern fixes this: instead of publishing to Kafka directly, the service writes the event into an outbox_events table in the SAME database transaction as the order itself. A separate lightweight process (or Kafka Connect's Debezium connector) tails that table and publishes to Kafka. Since the order row and the outbox row are committed atomically, the event can never be "lost" relative to the order.
+9.4 Query & Access-Pattern Optimization
+Indexing: composite index on orders(user_id, created_at DESC) makes "a user's order history" ΓÇö the single most common Order query ΓÇö an index-only scan instead of a table scan.
+Cache-aside for the catalog: the Product Service checks Redis first; on a miss it reads MongoDB and populates the cache with a TTL. A price or stock update explicitly invalidates the key rather than waiting for TTL expiry, so stale prices (flagged in Section 4.5) are minimized.
+Read replicas: Order and Payment Postgres instances run with one or more read replicas; reporting/analytics queries and "get my order history" reads are routed to a replica, keeping the primary free for writes.
+Connection pooling: PgBouncer sits in front of Postgres so hundreds of short-lived pod connections don't exhaust the database's native connection limit.
+Avoiding N+1 queries: fetching an order with its items uses a single JOIN (or a batched IN query) in the repository layer, never a loop issuing one query per item.
+Table partitioning: as the orders table grows, it's range-partitioned by created_at (e.g., monthly) so old-order archival and index maintenance don't lock the whole table.
+Denormalized read models: the Order Service keeps a small denormalized copy of product name/price at order time (not a live join to the Catalog DB) ΓÇö this also correctly preserves historical pricing even after the product's price later changes.
+9.5 Cross-Service Consistency: The Saga Pattern
+Order Service creates order (PENDING) and publishes order.created.
+Inventory Service atomically reserves stock and publishes inventory.reserved, or publishes inventory.rejected.
+Payment Service consumes inventory.reserved, charges the customer, and publishes payment.completed or payment.failed.
+On payment.failed, Inventory releases the reservation and Order moves to CANCELLED. Every reservation has a TTL/expiry path so stock cannot remain held forever if an event or consumer is lost.
+≡ƒÆí This is a choreographed saga ΓÇö each service reacts to events with no central coordinator. Larger systems sometimes use an orchestrated saga instead (a dedicated Order Orchestrator service explicitly calling each step) when the workflow gets too complex to follow via events alone.
+
+
+10. Error Handling & Cascading Failure Prevention
+A distributed system fails in ways a monolith never does: one slow dependency can exhaust every caller's threads/connections and take the whole platform down with it ΓÇö a cascading failure. This section covers the specific techniques used to stop that, and why each one was chosen over the alternative.
+10.1 API Gateway & Centralized Auth
+The Gateway validates JWTs and enforces rate limits before a request reaches any internal service, so individual services can trust that anything reaching them already passed the gate, instead of every service re-implementing auth.
+10.2 Timeouts, Retries & Backoff
+Why chosen: a call with no timeout can hang a request thread indefinitely, and an unbounded retry can turn a brief blip into a self-inflicted traffic spike (a "retry storm") that makes the outage worse.
+10.3 Circuit Breakers
+Analogy: an electrical circuit breaker. If Payment starts failing repeatedly, a breaker (e.g. the opossum library) trips and fails fast instead of letting callers queue up waiting threads. After a cooldown, it allows a trial request through to check recovery.
+Why chosen over just retrying: retries help with brief blips; a circuit breaker is for sustained outages, where continuing to retry would only pile up load on an already-struggling dependency and delay its recovery.
+10.4 Bulkhead Pattern
+Named after a ship's bulkheads, which stop one flooded compartment from sinking the whole vessel. Applied here: the Order Service uses a separate, size-limited connection pool/thread pool for calls to Payment vs. calls to its own database. If Payment is slow, it can only ever exhaust its OWN pool ΓÇö order reads/writes keep working normally.
+10.5 Graceful Degradation & Fallbacks
+Why chosen: for read paths, a slightly stale or reduced response is almost always better than a hard error page.
+If the Product Service's live stock check times out, the page falls back to the last cached stock_hint (Section 9.1) with a "low confidence" flag, rather than failing the whole page load.
+If Recommendations (a non-critical service) is down, the product page simply omits the "You may also like" section instead of failing the entire request ΓÇö this is why non-critical calls are made in parallel and awaited independently, not chained into the critical path.
+10.6 Centralized Error Handling Middleware
+5xx messages are deliberately generic to the client (never leak stack traces/internals) while the full error is logged server-side against the correlation ID.
+4xx messages stay specific ("Item out of stock") because the client needs that detail to react correctly.
+10.7 Distributed Tracing & Correlation IDs
+The Gateway assigns every request an x-correlation-id. Every service's logger includes that ID, and it also rides along as a Kafka message header (Section 8.4) ΓÇö so one ID can trace a request across both synchronous hops and asynchronous event chains, and directly into the error-handler output above.
+10.8 Network & Secrets Security
+Traffic between pods is restricted using Kubernetes NetworkPolicies (e.g., only the Gateway may call Order Service directly).
+Service-to-service traffic can be encrypted with mutual TLS via a service mesh (Istio/Linkerd) in larger deployments.
+Credentials live in Kubernetes Secrets / AWS Secrets Manager (Section 13), never in the image or source code.
+
+11. Idempotency Deep Dive: Payment APIs
+This is the single highest-stakes correctness problem in the whole system: a network retry must never charge a customer twice. If a client calls POST /payments and the response is lost to a timeout (even though the charge actually succeeded on Payment's end), the client's natural reaction ΓÇö retry ΓÇö must be provably safe.
+11.1 The Idempotency-Key Pattern
+The client (frontend, Section 4.5) generates a unique Idempotency-Key (a UUID) once, before the first attempt at a given payment.
+Every retry of that SAME logical payment reuses the SAME key ΓÇö this is the critical part; a new key per retry defeats the whole mechanism.
+The Payment Service checks an idempotency_keys table for that key BEFORE processing: if found and completed, it returns the ORIGINAL stored response immediately, without charging again.
+If the key is new, it processes the payment, stores the result against the key, and returns it.
+If the key exists but is still IN_PROGRESS (a concurrent duplicate request arrived while the first was still processing), the second request is rejected with 409 Conflict rather than racing the first.
+11.2 Idempotency Store Schema
+
+
+11.3 Implementation Sketch
+≡ƒÆí This check-then-insert must use a unique DB constraint on idempotency_key plus a single atomic upsert (INSERT ... ON CONFLICT DO NOTHING in Postgres) ΓÇö a naive "check, then insert" without that constraint has its own race condition between the check and the insert.
+11.4 Exactly How Concurrent Duplicates Are Resolved at the Database Level
+Section 11.3's note glossed over a subtlety worth spelling out fully, because it's the same class of race condition as Section 3.4: what if the SAME idempotency key arrives twice at almost the same instant ΓÇö not a slow retry seconds later, but truly concurrent, e.g., a client that fires the request and, 50ms later before any response arrives, fires an automatic retry?
+Because idempotency_key is the PRIMARY KEY, Postgres enforces uniqueness at the storage engine level ΓÇö two concurrent INSERTs for the same key cannot both succeed, even if they arrive on different database connections at the exact same microsecond. One of them wins the RETURNING row; the other gets back zero rows, meaning "someone else already claimed this key." Here is the exact timeline for two truly concurrent requests carrying the same key:
+≡ƒÆí The key mechanical point: the database's unique-index enforcement is what makes this safe, not application logic. No amount of careful if-statements in Node.js can substitute for this, because two Node.js processes (or even two requests on the same process's connection pool) can genuinely execute their JavaScript at the same instant ΓÇö only the database's atomic constraint check has a single, consistent view of "has this key been claimed yet."
+11.5 Layering On Top of the Payment Gateway's Own Idempotency
+Stripe and PayPal both accept their own idempotency key on the charge call. The Payment Service's internal key (Section 11.2) and the gateway's key are complementary, not redundant: the internal key protects against the CLIENT retrying the call to the Payment Service; the gateway key additionally protects against the Payment Service itself retrying its own outbound call to Stripe (e.g., after a bulkhead-limited timeout in Section 10.4) without double-charging at the gateway level.
+11.6 Idempotency Edge Cases
+11.7 Payment Reconciliation & Refunds
+Payment is a distributed boundary with an external system, so a periodic reconciliation job should compare Payment records, gateway transaction status and verified webhook events. Unknown outcomes should become REQUIRES_RECONCILIATION rather than being automatically retried as a new charge.
+Refunds need their own idempotency key and lifecycle (REQUESTED ΓåÆ SUBMITTED ΓåÆ CONFIRMED / FAILED). A refund operation must be safe to retry and must never create two provider refunds for the same business reason.
+Same key, different amount: treated as a client bug ΓÇö rejected with 422 (Section 11.3), never silently processed with either amount.
+Key reused after expiry (>24h): treated as a brand-new payment ΓÇö this is why the expiry window must comfortably exceed any realistic client retry timeout.
+Consumer crash mid-processing (status stuck IN_PROGRESS forever): a background sweeper job resolves keys stuck IN_PROGRESS past a short threshold (e.g. 2 minutes) by checking the actual gateway transaction status and correcting the row.
+Webhook-driven confirmation arrives before the synchronous response: the webhook handler (Stripe calling back asynchronously) updates the SAME idempotency-keyed row rather than creating a second record, keyed by the gateway's own transaction reference.
+
+12. Docker & Kubernetes: How They Fit
+Docker and Kubernetes solve two different problems. Docker packages a single service into a portable, reproducible unit. Kubernetes runs, scales, and heals many of those units across a cluster of machines.
+12.1 Docker's Role: Packaging
+Every service (from the directory structure in Section 16) is built into its own container image via a multi-stage Dockerfile ΓÇö one stage installs dependencies and builds, a second, minimal stage runs the app, keeping the final image small.
+Multi-stage build keeps the final image lean and runs as a non-root user (node) ΓÇö a basic production security practice.
+12.2 Kubernetes' Role: Orchestration
+Once each service is an image, Kubernetes takes over the operational concerns a monolith never had to think about: which machine runs which container, what happens when one crashes, and how many copies should be running right now.
+12.3 Deployment Topology Diagram
+
+Figure 5 ΓÇö order-service running as 3 pods behind a ClusterIP Service, fronted by an Ingress, scaled by an HPA, and configured via ConfigMap/Secret.
+
+12.4 Minimal Deployment Manifest
+What to notice
+resources.requests/limits prevent one misbehaving pod from starving others on the same node ΓÇö a monolith on a single VM never needed this.
+readinessProbe stops the Service from sending traffic to a pod that's still starting up; livenessProbe tells Kubernetes to restart a pod that has become unresponsive.
+The image is tagged with a version (1.4.0), never :latest ΓÇö reproducible deployments require knowing exactly what's running.
+12.5 Resource Sizing Methodology
+The requests/limits numbers in Section 12.4 aren't guesses ΓÇö an admin arrives at them methodically, and re-checks them as traffic patterns change:
+Start from load-test data (Section 14.6), not intuition: run the service under a representative load profile and record actual CPU/memory usage via Prometheus (Section 15.1).
+Set requests to roughly the p50 (median) observed usage ΓÇö this is what the Kubernetes scheduler reserves for the pod on a node, so setting it too high wastes cluster capacity, and too low causes the scheduler to over-pack nodes.
+Set limits to roughly the p99 observed usage plus headroom for traffic spikes ΓÇö this is the hard ceiling; a CPU limit throttles the pod's CPU time, while a memory limit that's exceeded gets the pod OOMKilled.
+Re-run this exercise after any significant code change (a new dependency, a new code path) and on a recurring cadence (e.g., quarterly) as real production traffic patterns emerge ΓÇö initial sizing from a load test is a starting point, not a permanent setting.
+12.6 Pod Disruption Budgets & Network Policies
+Two more Kubernetes objects worth naming explicitly, since both directly prevent real incidents this system has to plan for.
+Without a PodDisruptionBudget, a routine cluster operation ΓÇö draining a node for a Kubernetes version upgrade, or the cluster autoscaler scaling down ΓÇö could terminate 2 of Order Service's 3 pods simultaneously, leaving only 1 to absorb all traffic. The PDB tells Kubernetes "never let a voluntary disruption take availability below this line," and Kubernetes will delay the drain/scale-down until it can proceed safely.
+≡ƒÆí Without this NetworkPolicy, Kubernetes' default is to allow all pod-to-pod traffic within the cluster ΓÇö meaning a single compromised or misbehaving pod could call any other service directly. Explicit NetworkPolicies turn that default off service by service, which is why Section 10.8 lists this as a security control rather than an optional hardening step.
+13. AWS Services Mapping & Deployment Architecture
+Section 12 described Kubernetes concepts generically. This section maps every piece of the system onto concrete AWS services, so the architecture in Figure 1 becomes something actually deployable.
+13.1 Service Mapping Table
+13.2 Deployment Architecture Diagram
+
+Figure 7 ΓÇö the same logical architecture from Figure 1, mapped onto a VPC with public subnets (ALB only) and private subnets (EKS, databases, cache, Kafka).
+13.3 Network Design Notes
+Only the ALB sits in public subnets; EKS nodes, RDS, ElastiCache, and MSK all sit in private subnets with no direct internet route ΓÇö outbound internet access (e.g., for calling Stripe) goes through a NAT Gateway.
+Security groups are scoped tightly: RDS's security group only accepts inbound traffic from the EKS node security group, never from 0.0.0.0/0.
+Each environment (dev/staging/prod, Section 14) gets its own VPC or at minimum its own set of subnets, so a staging misconfiguration can't reach production data.
+
+13.4 Admin's View: VPC & Subnet Layout
+Figure 7 showed the logical picture. This is the same VPC from an infrastructure admin's console ΓÇö the actual CIDR blocks, Availability Zones, and subnet tiers someone provisioning this account would create.
+
+Figure 10 ΓÇö a 2-AZ VPC with three subnet tiers per AZ. Admin access into private subnets goes through AWS Systems Manager Session Manager, never a public bastion host or an open SSH port.
+13.5 Subnet & CIDR Plan
+≡ƒÆí Two AZs is the minimum for the Multi-AZ RDS failover and EKS node-group spread used elsewhere in this guide; a production account typically adds a third AZ for extra resilience margin, following the same pattern.
+
+13.6 Why This Layout (Reasoning)
+13.7 Provisioning Order: Standing Up the Account
+This is the actual sequence an admin follows the first time this infrastructure is created ΓÇö later changes go through Terraform/CI (Section 13.9), but understanding the raw order matters for debugging and for onboarding a new admin.
+Create the VPC (10.0.0.0/16) and enable DNS hostnames/resolution.
+Create the Internet Gateway and attach it to the VPC.
+Create 6 subnets across 2 AZs per the CIDR plan in Section 13.5.
+Create 2 NAT Gateways (one per public subnet), each with its own Elastic IP.
+Create route tables: a public route table (0.0.0.0/0 ΓåÆ IGW) attached to the public subnets, and one private route table per AZ (0.0.0.0/0 ΓåÆ that AZ's NAT Gateway) attached to its app and data subnets.
+Create the VPC Endpoints for S3, ECR (api + dkr), Secrets Manager, and SSM (ssm, ssmmessages, ec2messages) in the private route tables.
+Create security groups: alb-sg (inbound 443 from 0.0.0.0/0), eks-node-sg (inbound from alb-sg on service ports, inbound from itself for pod-to-pod), rds-sg (inbound 5432 from eks-node-sg only), redis-sg (inbound 6379 from eks-node-sg only), msk-sg (inbound 9092/9094 from eks-node-sg only).
+Create the EKS cluster control plane, specifying the private app subnets (both AZs) for worker-node placement.
+Create the workload identity configuration. Prefer EKS Pod Identity for EKS workloads; retain an OIDC/IRSA path when a specific integration requires it.
+Create the managed node group(s) in the private app subnets, attached to eks-node-sg.
+Create the RDS Multi-AZ instances (Order/Auth/Payment/Inventory) in the private data subnets, attached to rds-sg, with a DB subnet group spanning both AZs.
+Create the ElastiCache Redis replication group and the MSK cluster in the same private data subnets, attached to their respective security groups.
+Create the ECR repositories (one per service) and the S3 bucket + CloudFront distribution for the React build.
+Install the AWS Load Balancer Controller into the cluster (via Helm) so Kubernetes Ingress resources provision real ALBs automatically.
+Bootstrap ArgoCD into the cluster and point it at the GitOps manifest repository (Section 14.2) ΓÇö from this point on, deployments are Git commits, not manual console actions.
+13.8 IAM Roles & Workload Identity (EKS Pod Identity / IRSA)
+A naive setup gives every pod the EKS node's IAM role, which means every service can call every AWS API the node can ΓÇö a Product Service pod could technically read Payment's secrets. IAM Roles for Service Accounts (IRSA) fixes this: each Kubernetes ServiceAccount gets its OWN narrow IAM role, assumed only by pods using that ServiceAccount, via the OIDC provider created in Section 13.7.
+≡ƒÆí Why OIDC federation for CI instead of long-lived AWS access keys in GitHub Secrets? A long-lived key that leaks is valid until manually rotated; an OIDC-federated role issues short-lived credentials scoped to that specific workflow run, so a leaked credential expires in minutes rather than being a standing risk.
+
+13.9 Infrastructure as Code (Terraform Skeleton)
+Everything in Section 13.7 is, in practice, defined once in Terraform rather than clicked through the console ΓÇö this is what actually gets committed, reviewed, and re-run for staging/prod parity.
+Running terraform plan against this before every apply is what lets an admin see exactly what will change in staging or prod before it happens ΓÇö the same discipline as a code review, applied to infrastructure.
+
+13.10 Deploying the Application Onto Provisioned Infrastructure
+Once Section 13.7/13.9's infrastructure exists, getting the actual application running is a separate, repeatable set of steps ΓÇö this is what a new admin (or a disaster-recovery rebuild) runs against a fresh cluster.
+Step 1 is the only step run by a human against a brand-new cluster; everything after step 3 is self-driving via ArgoCD's continuous reconciliation loop.
+external-secrets syncs the AWS Secrets Manager entries from Section 13.8 into native Kubernetes Secrets, so application manifests never hard-code a secret ARN or value.
+
+13.11 Disaster Recovery & Backup Strategy
+Provisioning the infrastructure (Section 13.7) answers "how does this get built"; disaster recovery answers "what happens when part of it is destroyed." Every data store in Section 9 has an explicit backup and recovery plan ΓÇö "RDS backs itself up" is not a DR plan on its own until the recovery time and recovery point are stated and tested.
+RPO (Recovery Point Objective) and RTO (Recovery Time Objective) are stated per store because they genuinely differ: losing 5 minutes of session cache is a non-event, while losing 5 minutes of Order/Payment writes is a serious incident ΓÇö the numbers above reflect that Postgres gets the tightest guarantees precisely because it holds the money- and stock-critical data identified back in Section 9.1.
+Backups are tested, not just taken: a scheduled job restores the latest Order DB snapshot into an isolated environment and runs a smoke-test query monthly ΓÇö an untested backup is a hypothesis, not a guarantee.
+Cross-region snapshot copies (RDS's automated cross-region snapshot copy) protect against a full region outage, not just an AZ failure, at the cost of the snapshot's copy lag becoming part of the effective RPO for that specific failure mode.
+
+13.12 Multi-Region Considerations
+Everything in this guide so far describes a single-region, multi-AZ deployment ΓÇö the right starting point for most systems, since multi-AZ already protects against the far more common failure (a single data center/AZ issue) at a fraction of the operational cost of multi-region. Multi-region is a deliberate, later step taken for two different reasons, which lead to two different architectures:
+≡ƒÆí This system's recommended default is active-passive DR, not active-active: it delivers real resilience against the highest-impact failure (a region going down) without taking on active-active's cross-region consistency problem, which the Saga pattern (Section 9.5) already has to solve WITHIN one region and shouldn't have to solve across two at the same time.
+13.13 AWS Reference Architecture: Control Plane, Data Plane and Trust Boundaries
+The deployment is divided into three planes. This makes the AWS architecture easier to secure, scale and operate because each plane has a different trust model and failure domain.
+ΓÇó Public edge: Route 53 ΓåÆ CloudFront/WAF ΓåÆ ALB. End users never connect directly to EKS nodes, pods, databases, Redis or Kafka brokers.
+ΓÇó Application data plane: EKS services and workers access RDS, DocumentDB, Redis, MSK and SQS through private networking and explicit identities.
+ΓÇó AWS management plane: EKS API, ECR, Secrets Manager, CloudWatch, CloudTrail and deployment tooling are administrative surfaces and should not share the same access path as shopper traffic.
+ΓÇó External payment providers use controlled outbound connectivity. AWS API traffic should prefer VPC endpoints where supported, reserving NAT for true public-internet dependencies.
+
+13.14 End-to-End AWS Request Path
+Browser
+  |
+  v
+Route 53
+  |
+  v
+CloudFront + AWS WAF
+  |\
+  | +------> S3 (React build; bucket private)
+  v
+Application Load Balancer + ACM
+  |
+  v
+EKS Ingress / API Gateway
+  |
+  +--> Auth / Catalog / Cart / Order
+           |
+           +--> RDS / DocumentDB / Redis
+           |
+           +--> MSK / SQS
+
+Payment provider path:
+Payment Service -> controlled egress -> Stripe/PayPal
+
+Observability path:
+EKS + AWS services -> CloudWatch/OpenTelemetry -> dashboards/alerts
+Only the first hop is public. Once traffic enters the AWS VPC, the design relies on private subnets, load-balancer target groups, Kubernetes service discovery, database security groups, NetworkPolicy and least-privilege IAM.
+
+13.15 VPC, Subnets and Route Tables
+
+Use a multi-AZ VPC with separate public, private-application and private-data tiers. The public tier contains only internet-facing load-balancers and controlled egress components; application and stateful resources stay private.
+ΓÇó Size subnets for VPC CNI pod addresses as well as EC2 node addresses. A cluster can exhaust pod IPs before CPU becomes the scaling bottleneck.
+ΓÇó Reserve unused CIDR space so a third AZ or an additional workload tier can be introduced without redesigning the VPC.
+ΓÇó Use separate VPCs for production and non-production when the business impact of an accidental cross-environment connection is high; otherwise, enforce strict subnet, security-group and IAM isolation.
+
+
+13.16 EKS Production Baseline
+ΓÇó Parameterize the EKS version and maintain an explicit upgrade policy. Do not let the architecture document become the source of truth for a specific Kubernetes minor version.
+variable "eks_version" {
+  type    = string
+  default = "<approved-supported-version>"
+}
+
+module "eks" {
+  source          = "terraform-aws-modules/eks/aws"
+  cluster_name    = "ecommerce-${var.env}"
+  cluster_version = var.eks_version
+}
+
+13.17 CloudFront, S3, TLS and WAF
+
+ΓÇó Keep the S3 bucket private and expose the React application through CloudFront. Use Origin Access Control (OAC) rather than public bucket access so users cannot bypass the distribution.
+ΓÇó Use CloudFront for cacheable public assets and ALB for API traffic. Keep cache policies explicit so authorization headers and dynamic API responses are not accidentally cached.
+ΓÇó Use ACM certificates and redirect HTTP to HTTPS. Keep certificate ownership in the platform layer so application teams do not manage private keys in source repositories.
+ΓÇó Use WAF managed rules as the baseline, then apply narrower rate limits to authentication, checkout, payment and admin endpoints.
+ΓÇó Use immutable, content-hashed frontend assets so a rollback can safely restore an older build without fighting browser/CDN caches.
+13.18 Security Groups and East-West Traffic Matrix
+Security groups protect VPC interfaces and managed services; Kubernetes NetworkPolicy protects pod-level east-west traffic. Use both layers rather than assuming one replaces the other.
+
+13.19 IAM and Workload Identity
+
+
+Use EKS Pod Identity for workload-to-AWS permissions where practical. The important property is not the mechanism name but the isolation boundary: a payment pod should receive payment permissions and nothing else. Keep CI credentials short-lived via OIDC federation rather than long-lived static AWS keys.
+
+13.20 Managed Data Services: Production Operating Model
+
+
+For Kafka, production readiness requires client-side resilience as well as broker redundancy. Consumers must handle broker movement, rebalances and redelivery without duplicating business side effects.
+
+13.21 NAT, VPC Endpoints and Egress Strategy
+
+Private workloads should use public internet egress only when necessary. NAT provides controlled IPv4 egress; VPC gateway/interface endpoints keep supported AWS service calls inside AWS networking and reduce NAT dependence.
+ΓÇó With zonal NAT Gateways, route each private subnet to the NAT in the same AZ so a single-AZ failure does not remove outbound connectivity from healthy AZs.
+ΓÇó Prefer S3 gateway endpoints and interface endpoints for AWS services such as ECR, Secrets Manager and Systems Manager when they are part of the workload path.
+ΓÇó Define an external egress allowlist for third-party APIs, monitor egress bytes, and investigate new destinations as a security signal.
+ΓÇó Evaluate Regional NAT Gateway when it materially simplifies HA and routing. Make the choice from actual egress requirements and cost, not from a default assumption.
+
+
+13.22 Infrastructure Provisioning and Deployment Flow
+Terraform
+  -> VPC / EKS / RDS / MSK / Redis / IAM
+        |
+        v
+Platform bootstrap
+  -> Load Balancer Controller / External Secrets / Telemetry
+        |
+        v
+GitOps
+  -> Gateway / Services / Consumers / Ingress
+        |
+        v
+Canary
+  -> 5% -> 25% -> 50% -> 100% (only while SLOs remain healthy)
+The operating rule is that infrastructure is Terraform-controlled, platform add-ons are repeatable bootstrap components, and application desired state is GitOps-controlled. Production should not depend on an engineer manually editing live Kubernetes objects.
+
+13.23 Zero-Downtime Deployment Mechanics
+
+ΓÇó New pods become Ready before old pods are drained. Readiness should reflect real dependency readiness, not simply process startup.
+ΓÇó Use graceful shutdown and preStop behavior so in-flight HTTP requests and Kafka processing can drain safely.
+ΓÇó Use expand ΓåÆ migrate ΓåÆ contract for database changes so old and new application versions can coexist during the rollout.
+ΓÇó Keep API and event schemas backward-compatible for the entire rollout window; producers may be upgraded before every consumer.
+ΓÇó Canary decisions should use both technical and business metrics: 5xx rate, p95 latency, checkout success, payment failures, order creation rate and Kafka lag.
+13.24 Observability and AWS Operations
+Use OpenTelemetry context propagation so one trace can cross the Gateway, services, Kafka producer/consumer and external integration boundaries. Correlation IDs remain useful in logs, but trace context should be the primary dependency and latency correlation mechanism.
+
+
+13.25 Cost Controls and Capacity Planning
+
+Capacity planning should start from business traffic. Translate peak orders/minute into API QPS, database writes, Kafka events/second, consumer concurrency and VPC IP consumption, then validate the model with load testing.
+Example
+Peak orders/min = 600
+Peak checkout QPS ~= 10
+Average domain events/order = 8
+Kafka event rate ~= 80 events/sec
+Design burst factor = 5x
+Target event capacity ~= 400 events/sec
+Validate: partitions, broker throughput, DB IOPS, pod replicas, subnet IPs
+13.26 DR and Region Failover
+
+
+The default remains single-region, multi-AZ. A second region is a separate resilience project: define data ownership, replication lag, failover authority, DNS behavior and duplicate-processing rules before calling the architecture multi-region ready.
+
+13.27 Secrets, Rotation and Configuration Hygiene
+
+ΓÇó Store credentials in AWS Secrets Manager; never commit secrets to Git, bake them into images or place provider keys in ConfigMaps.
+ΓÇó Enable automatic rotation where the credential type supports it, and make services tolerant of credential changes so rotation does not require a full platform restart.
+ΓÇó Use KMS-backed encryption for sensitive stores and audit secret access through CloudTrail.
+ΓÇó Treat configuration and secret names as stable contracts. Rotate values without casually renaming keys that would force simultaneous application changes.
+
+13.28 AWS Production Readiness Checklist
+ΓÇó Only CloudFront/ALB is internet-facing for the application; databases and EKS worker nodes are private.
+ΓÇó EKS API access is private or tightly restricted.
+ΓÇó S3 blocks public access and is reachable from the browser through CloudFront OAC.
+ΓÇó WAF protections and endpoint-specific rate limits are tested.
+ΓÇó Every workload uses a dedicated service account and least-privilege AWS identity.
+ΓÇó Backups, PITR and restore tests are documented for each source-of-truth store.
+ΓÇó MSK has explicit partitioning, retention, authentication and lag policies.
+ΓÇó Terraform owns infrastructure state; GitOps owns application desired state.
+ΓÇó Canary rollback is automatic and uses technical plus business metrics.
+ΓÇó AZ-failure, dependency-failure and regional-failover drills are scheduled and measured.
+13.29 AWS Reference Documentation
+
+Official AWS references used to refine this deployment guidance:
+ΓÇó Amazon EKS VPC and subnet considerations ΓÇö https://docs.aws.amazon.com/eks/latest/best-practices/subnets.html
+ΓÇó Amazon EKS cluster endpoint access ΓÇö https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html
+ΓÇó Amazon EKS Pod Identity ΓÇö https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html
+ΓÇó CloudFront Origin Access Control for S3 ΓÇö https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html
+ΓÇó Amazon MSK best practices ΓÇö https://docs.aws.amazon.com/msk/latest/developerguide/bestpractices.html
+ΓÇó Amazon VPC NAT Gateway basics ΓÇö https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html
+ΓÇó AWS Secrets Manager rotation ΓÇö https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html
+14. CI/CD Pipeline
+The pipeline turns a git push into a safely deployed change, with automated gates at every stage instead of manual deploys.
+14.1 Continuous Integration
+
+Figure 8 ΓÇö every pull request runs lint/tests, builds and scans an image, then pushes it to ECR tagged with the commit SHA (never :latest, for the same reproducibility reason as Section 12.4).
+14.2 Continuous Deployment (GitOps)
+
+Figure 9 ΓÇö ArgoCD watches a Git repo of Kubernetes manifests (the "desired state") and automatically reconciles the cluster to match it; promotion between environments is a Git commit, not a manual kubectl apply.
+Dev: every merge to main auto-deploys immediately ΓÇö this environment is expected to be occasionally broken.
+Staging: auto-deploys after dev, followed by automated smoke tests (a scripted checkout flow hitting real staging services).
+Canary in prod: Argo Rollouts shifts 5% of production traffic to the new version while watching error-rate and latency metrics from Prometheus/CloudWatch.
+Full rollout: promotes automatically only if canary metrics stay healthy for a set window; otherwise Argo Rollouts automatically reverts traffic to the previous version ΓÇö a rollback that requires no human to be paged at 2 a.m. for a bad deploy.
+14.3 Sample GitHub Actions Workflow
+The last step is the GitOps handoff: CI's only job is to produce a scanned image and update a manifest; ArgoCD (not this workflow) performs the actual deployment.
+14.4 Testing Strategy: The Test Pyramid
+The "Lint + Unit Tests" box in Figure 8 hides a deliberately shaped set of test types ΓÇö deliberately more unit tests than integration tests, and more integration tests than end-to-end tests, because each layer up gets slower and more brittle.
+≡ƒÆí The common anti-pattern this pyramid avoids: a suite dominated by end-to-end tests. They're the most realistic but also the slowest and the most likely to fail for reasons unrelated to the code change (a flaky network call, a timing issue) ΓÇö a large e2e suite becomes something engineers learn to ignore or re-run rather than trust, which defeats its purpose.
+14.5 Contract Testing for Kafka Events
+Unit tests catch bugs within the Order Service; they cannot catch "the Order Service renamed a field, and the Notification Service ΓÇö in a completely different repository ΓÇö will silently break in production." Contract testing (using a tool like Pact) closes that gap without requiring either service to run the other's code in CI.
+The consumer (Notification Service) writes a contract test stating what it expects an order.created event to look like ΓÇö which fields it reads and their types ΓÇö and Pact generates a contract file from that expectation.
+The contract file is published to a shared Pact Broker.
+The producer (Order Service)'s CI pipeline fetches the latest contract from the broker and verifies its ACTUAL event output against it ΓÇö if Order Service's CI run fails this verification, the breaking change is caught in Order Service's own pull request, before it ever merges, let alone deploys.
+This is deliberately the opposite direction of an integration test: instead of Notification Service testing against a real Order Service, Order Service tests against Notification Service's stated expectations ΓÇö which scales to many consumers without the producer needing to know about, or run, each one individually.
+14.6 Load & Chaos Testing
+CI's tests (Section 14.4) verify correctness. They say nothing about whether the system holds up under Black-Friday-level traffic, or recovers cleanly when a dependency actually fails ΓÇö two different, deliberately destructive kinds of testing that run outside the per-PR pipeline.
+Load testing (k6 or Gatling): a scripted ramp-up simulating realistic checkout traffic is run against staging before major sales events, validating the resource sizing from Section 12.5 and the HPA thresholds from Section 12.2 against real numbers rather than estimates.
+Chaos testing (AWS Fault Injection Simulator, or Chaos Mesh in-cluster): deliberately kills a random Order Service pod, or injects latency into the Payment Service's calls, IN A CONTROLLED WINDOW, to verify the circuit breakers (Section 10.3), bulkheads (Section 10.4), and PodDisruptionBudget (Section 12.6) behave as designed ΓÇö rather than discovering their behavior for the first time during a real incident.
+≡ƒÆí Both load and chaos tests run against staging (or a dedicated pre-prod environment), never directly against production ΓÇö the goal is to find the breaking point and the failure behavior on purpose, on a schedule the team controls, which is the entire value of doing this proactively rather than waiting for an actual outage to teach the same lesson.
+
+15. Logging & Monitoring in Production
+Once services are distributed across many pods, you can't just SSH in and tail a log file. Production systems centralize both metrics (numbers over time) and logs (discrete events) so an engineer can answer "what's happening right now" and "what happened during that incident" from one place.
+15.1 Metrics: Prometheus + Grafana
+Each service exposes a /metrics HTTP endpoint (via prom-client in Node.js). Prometheus scrapes this endpoint on a schedule and stores the time-series data; Grafana queries Prometheus to render dashboards.
+A useful mental model for what to measure is the RED method for services (Rate, Errors, Duration) and the USE method for resources (Utilization, Saturation, Errors) ΓÇö e.g., for Order Service: request rate, error rate, p95 latency (RED); and CPU/memory utilization, queue depth (USE).
+Order Service: requests/sec, error rate by status code, p95/p99 latency, DB connection pool saturation.
+Kafka consumers: consumer lag per partition (how far behind real-time a consumer is) ΓÇö the single most important Kafka health metric.
+Databases: query latency, active connections, replication lag.
+15.2 Logging: Structured Logs + EFK Stack
+Every service logs structured JSON (via Pino) rather than free-text lines, so logs are machine-parseable. Each pod's stdout is collected by a Fluent Bit DaemonSet running on every Kubernetes node, shipped to Elasticsearch, and browsed/searched in Kibana (the "EFK" stack ΓÇö an ELK stack using Fluent Bit instead of Logstash).
+A structured log line ΓÇö searching Kibana for correlationId: c4e1f2a0-... surfaces this exact request's journey across every service it touched.
+15.3 Alerting
+Prometheus's Alertmanager evaluates rules against the collected metrics (e.g., "error rate > 5% for 5 minutes" or "Kafka consumer lag > 10,000 messages") and routes notifications to Slack or PagerDuty, so humans are pulled in only when a threshold is actually breached ΓÇö not by watching dashboards all day.
+15.4 Distributed Tracing
+Metrics tell you THAT something is slow; traces tell you WHERE. Tools like OpenTelemetry (instrumenting each service) combined with Jaeger or Grafana Tempo let you visualize one request as a timeline of spans across the Gateway, Order Service, its database call, and even the asynchronous hop through Kafka to Payment ΓÇö turning the correlation ID from Section 10.7 into an actual visual waterfall.
+15.5 SLOs, SLIs & Error Budgets
+15.6 Business Metrics & Reconciliation Signals
+
+Dashboards should include business-level signals in addition to infrastructure metrics: checkout acceptance rate, payment success rate, inventory reservation failure rate, expired reservations, refund backlog, Kafka consumer lag by critical group, outbox backlog/age, and orders stuck in intermediate states beyond their expected duration.
+Alerting should distinguish infrastructure incidents from business-correctness incidents. A growing outbox backlog or orders stuck in PAYMENT_PENDING can indicate a distributed workflow failure even when HTTP error rates remain low.
+Section 2.2 stated availability and latency targets. This section is how those targets are made operational, rather than aspirational numbers nobody checks.
+The error budget is what turns Section 14's canary rollout (Figure 9) from a vague safety measure into a concrete decision rule: if a canary deploy would burn through a large fraction of the remaining monthly error budget in a short window, Argo Rollouts' automated analysis blocks the promotion ΓÇö the same mechanism protects against both a genuinely broken deploy and a slow accumulation of minor regressions that individually look acceptable.
+When the error budget is healthy (little of it spent), the team has room to ship faster and take on riskier changes.
+When the error budget is nearly exhausted, the team's priority explicitly shifts to reliability work over new features until it recovers ΓÇö this is what stops "launch velocity" and "reliability" from being a purely political argument, by giving both sides a shared, pre-agreed number.
+16. Production Directory Structure for Node.js
+controllers/ only translates HTTP Γåö service calls; almost no business logic.
+services/ holds business rules, independent of HTTP or SQL ΓÇö easy to unit test.
+models/ is the only layer allowed to talk to the database.
+events/ isolates Kafka details so the rest of the app doesn't know about topics/partitions directly.
+k8s/ keeps this service's deployment manifests versioned alongside its code.
+
+17. Step-by-Step Code Walkthrough
+This section keeps the original RabbitMQ-based walkthrough for the API Gateway, since a reverse-proxy gateway pattern is broker-agnostic; Section 8 already covered the Kafka producer/consumer equivalents used for the main event backbone. Real systems sometimes mix both: Kafka for high-volume domain events, and a simpler queue for lower-volume task-style jobs.
+17.1 API Gateway (Express + HTTP Proxy)
+rateLimit runs before any proxy route, stopping abusive traffic at the front door.
+Internal hostnames like order-service resolve via Kubernetes' internal DNS to the Service object from Figure 5.
+18. Putting It All Together: One Order, Start to Finish
+Browser sends POST /api/v1/orders. It hits the Ingress ΓåÆ API Gateway (Figure 1), never the Order Service directly.
+The pod's middleware ΓåÆ controller ΓåÆ validation ΓåÆ service layer validates the cart, requests the current product price from the Product Catalog Service, calculates the order total, and writes orders + order_items + an outbox_events row in ONE Postgres transaction (Figure 4). Inventory remains the source of truth for stock; Order Service does not read the Inventory database directly.
+A relay process reads the new outbox row and publishes order.created to Kafka, keyed by order_id (Section 8.4) ΓÇö guaranteeing the event is never lost relative to the DB write.
+Independently, Inventory Service consumes order.created and attempts the reservation. Only after inventory.reserved does Payment Service charge the customer and publish payment.completed (or payment.failed). This sequencing avoids charging for an order that could not reserve stock.
+If Payment fails, Inventory consumes payment.failed and releases its reservation; Order Service moves the order to CANCELLED. If a later fulfillment failure occurs after payment has succeeded, the design must issue a compensating refund and record the refund outcome for reconciliation.
+This is the core shape of the event-driven flow: the synchronous request only accepts the order, while inventory, payment, fulfillment, notifications and compensations proceed as independently retryable state transitions.
+19. System-Wide Edge Cases
+Individual sections above called out edge cases local to that topic. This section collects the ones that only appear when several parts of the system interact ΓÇö the cases that actually show up in production incident reviews.
+20. Common Pitfalls in Production Systems
+Sharing a database or a shared models library across services ΓÇö quietly recreates a monolith.
+Chaining synchronous calls 3+ services deep ΓÇö one slow link causes a cascading failure.
+Non-idempotent Kafka/queue consumers ΓÇö duplicate delivery is normal, not an edge case.
+Publishing to Kafka before the DB transaction commits (or vice versa without an outbox) ΓÇö the classic dual-write bug (Section 9.3).
+Skewed Kafka partition keys (e.g., keying by a low-cardinality field) ΓÇö creates "hot" partitions that one consumer can't keep up with.
+No resource requests/limits on Kubernetes pods ΓÇö one noisy-neighbor pod can starve others on the same node.
+Ignoring consumer lag as a metric ΓÇö a slowly growing lag is often the first sign of trouble, long before errors appear.
+Skipping correlation IDs early ΓÇö debugging a multi-service, part-sync-part-async bug without them is extremely painful.
+Reusing a fresh Idempotency-Key on every retry (instead of the same key) ΓÇö silently defeats the entire idempotency mechanism in Section 11.
+Mixing server-cache data and client-only UI state in one frontend store ΓÇö recreates cache-invalidation bugs that TanStack Query already solves (Section 4.2).
+Deploying straight to production without a canary stage ΓÇö the first signal of a bad deploy becomes a customer complaint instead of an automated rollback (Section 14.2).
+20.1 Architecture Decision Checklist
+Every cross-service workflow has an explicit state machine, timeout, retry policy, compensation path, and reconciliation path.
+No service reads another service's database directly; synchronous APIs and domain events are the integration boundaries.
+Every externally triggered mutation has an idempotency strategy, including payment, refunds, webhooks, and important consumer side effects.
+Each production SLO has a measurable SLI, alert threshold, owner, and a tested runbook.
+Infrastructure and application rollouts support safe rollback, backward-compatible migrations, and schema/event compatibility checks.
+21. Key Takeaways & Production Readiness
+The architecture is complete when correctness, security, operability and scale are treated as one system rather than isolated concerns.
+21.1 Key Design Guarantees
+Each cross-service workflow has an explicit state machine, timeout, retry policy, compensation path and reconciliation path.
+Inventory is the source of truth for stock and reservations; reservations expire safely and stock movements are auditable.
+Payment state is modeled independently from Order state, with idempotent authorization, capture and refund handling and verified webhooks.
+Safe change delivery combines API/event compatibility, zero-downtime migrations, canary rollout and automated rollback.
+21.2 Recommended Build Order
+1. Run the complete stack locally with Docker Compose and verify checkout, inventory-race and idempotency behavior.
+2. Add integration, contract, concurrency, load and failure-injection tests before production rollout.
+3. Deploy to EKS with GitOps, observability, SLOs, tested backups and canary delivery.
+4. Introduce regional DR or other advanced complexity only when measurable business requirements justify it.
+
+Appendix A: Architecture Decision Records (ADRs)
+The rationale tables throughout this document (Sections 6, 7.4, 9.1, 12, 13) explain why each choice was made, but they don't formally record what was explicitly considered and rejected. An Architecture Decision Record (ADR) captures that ΓÇö the context, the decision, the alternatives that were on the table, and the consequences accepted ΓÇö so a future engineer (or auditor) can see the reasoning was deliberate, not accidental, without having to reconstruct it from a chat log or a departed engineer's memory.
+≡ƒÆí Format: each ADR follows Context ΓåÆ Decision ΓåÆ Alternatives Considered ΓåÆ Consequences. New architectural decisions for this system should be added here going forward, numbered sequentially ΓÇö an ADR log is only useful if it stays current.
+ADR-001: Microservices over a Modular Monolith
+ADR-002: Apache Kafka over RabbitMQ for the Core Event Backbone
+ADR-003: PostgreSQL for Transactional Services, MongoDB for Catalog
+ADR-004: EKS over ECS/Fargate for Container Orchestration
+ADR-005: Idempotency Keys over Kafka Exactly-Once Semantics for Payments
+ADR-006: Active-Passive Disaster Recovery over Active-Active Multi-Region
+
+Appendix B: Capacity Planning & Traffic Estimation
+Section 12.5 sizes Kubernetes resource requests/limits from load-test data; this appendix is the back-of-envelope math that determines what that load test should even simulate ΓÇö the numbers a solution architect works out BEFORE the first line of infrastructure code is written, and revisits as real traffic data replaces assumptions.
+B.1 Assumptions (to be replaced with real data post-launch)
+Assume a mid-sized regional e-commerce platform: 500,000 monthly active users, a 3% daily conversion-to-purchase rate among active shoppers, and a Black-Friday-style peak of 8x average traffic.
+B.2 Baseline Traffic Estimate
+≡ƒÆí These are the numbers Section 12.5's Step 1 ("start from load-test data") should actually load-test AGAINST ΓÇö a load test that only simulates average-day traffic never validates the HPA thresholds (Section 12.2) or connection-pool sizing (Section 9.4) that matter during the one week a year they're actually tested by real traffic.
+B.3 Storage Growth Projection
+B.4 Connection Pool Sizing (worked example for Order Service)
+Section 9.4 mentions PgBouncer without giving the arithmetic; here it is, worked through for Order Service specifically:
+1.ΓÇéPeak Order Service replica count from Section 12.2's HPA: assume it scales to 10 pods under the 8x peak load above.
+2.ΓÇéEach pod's Node.js connection pool is configured for 10 connections (a typical default) ΓÇö 10 pods ├ù 10 connections = 100 potential direct connections to Postgres at peak.
+3.ΓÇéRDS's max_connections for the chosen instance class may be well under 100 once other services and admin/reporting connections are counted ΓÇö this is precisely the number that motivates routing pod connections through PgBouncer in transaction-pooling mode, which can serve 100 application-side connections from a much smaller number of actual Postgres backend connections.
+4.ΓÇéThe concrete sizing rule: set PgBouncer's default_pool_size to comfortably exceed the DATABASE's realistic concurrent-transaction capacity (informed by load testing, Section 14.6), not the application's connection-pool setting ΓÇö the whole point of pooling is that these two numbers don't have to match.
+
+Appendix C: Threat Model (STRIDE) for Checkout & Payment
+Section 10.8 lists network/secrets security controls and Section 13.19 covers IAM, but neither is a threat model ΓÇö a systematic walk through what could go wrong. STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege) applied to the checkout/payment flow specifically, since it's the highest-value target in the system.
+≡ƒÆí A threat model is a living document, not a one-time checklist: it should be revisited whenever a new integration is added (e.g., a new payment method, a new third-party webhook) ΓÇö Section 21.2's recommended build order should include a threat-model review as a gate before any new integration reaches production, alongside the testing and observability gates already listed there.
+
+Appendix D: Security Architecture ΓÇö Defense in Depth
+Security controls appear throughout this document wherever they're most relevant to the topic at hand ΓÇö Section 2.2's NFRs, Section 4.6's token storage, Section 10.8's network policies, Section 13's IAM, Appendix C's threat model. This appendix pulls the full picture together into one place, layer by layer, from the browser to the database, so the question "how is X actually secured end-to-end" has one answer to point to rather than six scattered ones.
+D.1 The Model: Zero Trust, Defense in Depth
+The guiding principle is Zero Trust: no request is trusted by virtue of WHERE it came from (inside the VPC, inside the cluster) ΓÇö every hop authenticates and authorizes independently, and every layer assumes the layer before it could fail. This is why the controls below overlap rather than forming a single chain: a gap in one layer is still caught by the next.
+≡ƒÆí Read this table as independent layers, not a single wall: an attacker who somehow bypasses the WAF still hits JWT validation at the Gateway; one who somehow forges a JWT still can't move laterally between services without a valid mesh identity (D.4); one who compromises a pod still can't read another service's database credentials (D.6/D.8's least-privilege scoping).
+D.2 Frontend / Client Security
+Section 4.6 already covers where tokens live in the browser; this section covers the other client-side risks a modern React SPA has to defend against.
+D.3 Edge & API Gateway Security
+Everything from the internet lands here before it ever reaches a service, which is why this layer carries the broadest, coarsest controls.
+ΓÇóΓÇéTLS termination happens at CloudFront/ALB using ACM-managed certificates with automatic renewal ΓÇö no service ever handles a raw, unencrypted request from the public internet.
+ΓÇóΓÇéAWS WAF (Section 13.1) filters common attack signatures (SQLi, XSS payloads, known bad IP reputation lists) before a request reaches the ALB, and rate-based rules throttle a single IP's request rate independently of the Gateway's own per-user rate limiting (Section 10.1).
+ΓÇóΓÇéThe Gateway validates the JWT's signature, issuer, audience, and expiry on every request ΓÇö not just its presence ΓÇö before proxying anywhere, and rejects malformed request bodies against a schema (Section 3's API contracts) before they reach business logic.
+ΓÇóΓÇéInternal service addresses (order-service.default.svc.cluster.local) are never resolvable from outside the cluster ΓÇö the Gateway is the only component with a public-facing route, which is what makes the internal Zero Trust layer in D.4 meaningful rather than redundant.
+D.4 Service-to-Service Security: Securing Communication Between Microservices
+This is the layer most system designs leave implicit ΓÇö "it's all inside our VPC, so it's trusted" ΓÇö which is exactly the assumption Zero Trust rejects. Section 10.8 and 12.6 already establish NetworkPolicies as a coarse allow-list ("only pods labeled api-gateway may open a connection to order-service on port 3003"). That controls WHICH pods can connect. It says nothing about WHO is on each end of that connection, or whether the traffic itself could be read or altered by anything sitting on the network path. Two further controls close that gap.
+D.4.1 Mutual TLS via a Service Mesh
+A service mesh (Istio or Linkerd) is installed alongside Kubernetes and injects a lightweight proxy (a "sidecar") into every pod. All traffic in and out of a pod's application container is transparently routed through its sidecar ΓÇö the application code itself makes plain, unencrypted HTTP calls exactly as shown in Section 13's code samples, and never has to know encryption is happening.
+
+Figure 11 ΓÇö Order Service's sidecar and Payment Service's sidecar each hold a short-lived certificate proving their identity; traffic between the two sidecars is encrypted and mutually authenticated, while each application container only ever talks to its own local sidecar in plain HTTP.
+ΓÇóΓÇéEvery workload gets a cryptographic identity (a SPIFFE ID, e.g. spiffe://cluster/order-service) issued by the mesh's certificate authority ΓÇö NOT an IP address or a Kubernetes label, which can be spoofed far more easily than a private key.
+ΓÇóΓÇéCertificates are short-lived (rotated automatically, often hourly) ΓÇö a leaked certificate is a much smaller, self-healing window of exposure than the multi-year TLS certificates typically used for public-facing endpoints.
+ΓÇóΓÇéBecause encryption happens at the sidecar, application code (the Section 13 Express examples) needs zero changes to gain mTLS ΓÇö this is precisely why the mesh is the practical way to add encryption-in-transit across dozens of internal service-to-service calls without touching every codebase.
+D.4.2 Service-Level Authorization (Not Just Authentication)
+mTLS answers "who is calling" cryptographically. It does not answer "should this caller be allowed to call this specific endpoint" ΓÇö that is a separate, explicit authorization policy, enforced at the mesh layer independent of whatever the application code itself checks.
+≡ƒÆí This is the mesh-level analogue of IRSA (Section 13.19): IRSA scopes what a service can do against AWS APIs; the mesh AuthorizationPolicy scopes what a service can do against OTHER SERVICES. A compromised Notification Service pod (Appendix C's Elevation-of-Privilege row) is blocked twice over ΓÇö once by the NetworkPolicy that never opens a route to it, and again by this policy even if it somehow reached Payment's network address.
+D.4.3 Propagating User Identity Across Internal Calls
+A subtlety many designs miss: once the Gateway validates a shopper's JWT, how does Order Service ΓÇö several hops and possibly a Kafka event later ΓÇö know which authenticated user this action is actually for, without re-trusting a client-supplied user ID?
+ΓÇóΓÇéThe Gateway forwards the original, still-valid JWT (or a short-lived internal token derived from it, carrying only the user ID and roles, not the full external claims) as an internal header on the downstream call ΓÇö internal services verify this token's signature exactly as the Gateway does, rather than trusting an unsigned X-User-Id header that any caller could set arbitrarily.
+ΓÇóΓÇéFor asynchronous flows, the user ID travels as part of the signed event payload (Section 8's order.created event already carries the authenticated order owner), so a consumer never has to "look up" who a request was for from an untrusted source.
+D.5 Kafka / Event Backbone Security
+The event backbone (Section 8) carries order, payment, and inventory data between services and deserves the same authentication and authorization rigor as any synchronous call.
+D.6 Data-at-Rest & Database Security
+ΓÇóΓÇéEvery RDS instance, DocumentDB cluster, and ElastiCache replication group is encrypted at rest with a KMS customer-managed key (Section 13.11's backups inherit this encryption automatically).
+ΓÇóΓÇéEach service connects to its database with its OWN least-privilege database user ΓÇö Order Service's DB user can read/write only the order_db schema's tables and cannot even see the payment_db schema exists, enforced at the PostgreSQL grant level, not just at the network layer (Section 6's database-per-service rule, made concrete).
+ΓÇóΓÇéReporting/analytics queries connect through a separate, read-only database user pointed at a read replica (Section 9.4) ΓÇö a compromised reporting credential can leak data but can never modify it.
+ΓÇóΓÇéPII fields (shipping address, phone number) are protected by RDS's encryption at rest as a baseline; where a specific field is highly sensitive, application-level field encryption (encrypting before INSERT, decrypting only in the service that owns the data) is used so even a raw database dump or a misconfigured snapshot share doesn't expose it in plaintext.
+ΓÇóΓÇéCard data specifically never reaches this system's own database in any form, encrypted or not ΓÇö Payment forwards directly to Stripe/PayPal (Section 2.2's PCI-DSS scope note) ΓÇö the strongest possible mitigation for that data class is simply not storing it at all.
+D.7 Container & Kubernetes Hardening
+D.8 Supply Chain Security
+ΓÇóΓÇéContainer images are scanned for known CVEs at build time (Trivy, Section 14.1) and base images are pinned to a specific digest, not a floating tag, so a base-image update can't silently introduce a vulnerability between builds.
+ΓÇóΓÇéA Software Bill of Materials (SBOM) is generated for each image at build time, giving a complete, queryable inventory of every package and version shipped ΓÇö essential for rapidly answering "are we affected" the next time a widely-used library has a disclosed CVE (as with Log4Shell).
+ΓÇóΓÇéApplication dependencies (npm) are scanned separately from container OS packages (D.2), since the two have different update cadences and different tooling.
+D.9 Security Monitoring & Incident Response
+ΓÇóΓÇéAWS GuardDuty continuously analyzes VPC Flow Logs, DNS logs, and CloudTrail for anomalous behavior (e.g., an EKS node suddenly port-scanning internally, or API calls from an unusual region) and feeds findings into the same alerting path as Section 15.3.
+ΓÇóΓÇéCloudTrail logs every AWS API call (who, from where, what action) ΓÇö the audit trail that answers "what did this IAM role actually do" after the fact, independent of the application's own structured logs (Section 15.2).
+ΓÇóΓÇéStructured application logs, GuardDuty findings, and CloudTrail are all ingested into the same centralized logging pipeline (Section 15.2's EFK stack) so a security investigation and an operational debugging session use the same correlation-ID-driven tooling rather than two disconnected systems.
+ΓÇóΓÇéA documented incident response runbook covers the specific, high-value scenario this section is built around: a suspected compromised service credential is rotated immediately via Secrets Manager (Section 13.8) without a full redeploy, and the corresponding IRSA role's recent AWS API activity is pulled from CloudTrail within minutes, not hours.
+D.10 Compliance Snapshot
+≡ƒÆí This snapshot is deliberately not a compliance certification ΓÇö actual PCI-DSS/GDPR/SOC 2 compliance requires a formal audit against the current, deployed system, not a design document. What this architecture provides is a foundation that makes each requirement tractable rather than an afterthought bolted on post-launch.
+
+Appendix E: Distributed Systems Concepts Reference
+Sections 3.4 and 9 use specific concurrency and consistency techniques (row locks, the outbox pattern, Sagas) without always naming the underlying theory they rest on. This appendix makes that theory explicit ΓÇö database transaction isolation, the CAP trade-off, and two mechanisms (circuit breakers, rate limiters) referenced earlier by name but not fully specified ΓÇö so the reasoning in the rest of the document connects to standard distributed-systems vocabulary.
+E.1 Database Transaction Isolation Levels
+Section 3.4 showed HOW this system prevents race conditions (atomic UPDATEs, SELECT ... FOR UPDATE, optimistic version checks). Isolation level is the DATABASE-WIDE setting that determines what a transaction can even see of other transactions' uncommitted or concurrently-committed work ΓÇö the backdrop those techniques operate against.
+E.1.1 The Anomalies (What Isolation Protects Against)
+E.1.2 The Four Standard Isolation Levels
+≡ƒÆí Why READ COMMITTED plus explicit locking, rather than a stricter isolation level, is the right default here: SERIALIZABLE gives the database full responsibility for correctness but at the cost of unpredictable retries under load. This system instead makes correctness explicit and local ΓÇö Section 3.4's atomic UPDATE ... WHERE quantity >= 1 doesn't need a stricter isolation level to be correct, because the WHERE clause and the row lock already make the check-and-write atomic regardless of what isolation level the rest of the transaction runs under.
+E.1.3 Setting Isolation Explicitly When It's Needed
+E.2 CAP Theorem: Where This System Sits
+The CAP theorem states that a distributed system can only guarantee two of three properties during a network partition: Consistency (every read sees the latest write), Availability (every request gets a response), and Partition tolerance (the system keeps working despite network failures between nodes). Partition tolerance isn't really optional for a multi-AZ, multi-service system (Section 13's VPC spans two AZs, and network partitions between them, however rare, must be survivable) ΓÇö so the real, everyday choice this system makes repeatedly is Consistency vs. Availability, not whether to have partition tolerance at all.
+≡ƒÆí This is why Section 9.5 explicitly chose a Saga over a distributed two-phase-commit (2PC) transaction spanning Order and Payment's databases: 2PC would push this system toward CP across services (blocking until every participant confirms), which conflicts with Section 2.2's availability target far more than the eventual consistency a Saga accepts.
+E.3 Circuit Breaker State Machine
+Section 10.3 introduces circuit breakers by analogy; this is the actual state machine libraries like opossum implement, which explains precisely when calls are allowed through and when they're rejected instantly.
+
+Figure 12 ΓÇö the three states every circuit breaker cycles through. Only CLOSED and HALF-OPEN ever let a real request reach the dependency; OPEN rejects instantly without attempting the call.
+E.4 Rate Limiting Algorithms
+Section 10.1 mentions Gateway-level rate limiting without specifying the algorithm. The choice matters ΓÇö different algorithms allow different burst behavior for the same average rate.

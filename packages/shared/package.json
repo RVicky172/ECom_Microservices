@@ -1,0 +1,21 @@
+{
+  "name": "@ecommerce/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "pino": "^9.4.0",
+    "joi": "^17.13.3",
+    "uuid": "^9.0.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/uuid": "^10.0.0"
+  }
+}
