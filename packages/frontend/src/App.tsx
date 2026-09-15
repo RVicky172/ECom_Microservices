@@ -1,46 +1,9 @@
 import React, { useState } from 'react';
-import axios, { AxiosInstance } from 'axios';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { login } from './api/storeApi';
+import { useStoreQueries } from './hooks/useStoreQueries';
+import type { LoginResponse, Product } from './types/store';
 import './styles.css';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-
-interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  price: number | string;
-  category?: string;
-  imageUrl?: string;
-}
-
-interface CartItem {
-  productId: string;
-  name: string;
-  price: number | string;
-  quantity: number;
-}
-
-interface CartResponse {
-  items: CartItem[];
-  itemCount: number;
-  total: number | string;
-}
-
-interface Order {
-  id: string;
-  status: string;
-  total_amount: number | string;
-  items?: Array<CartItem & { product_name?: string }>;
-}
-
-interface LoginResponse {
-  token: string;
-  user: {
-    name: string;
-    role: string;
-  };
-}
 
 const productImages: Record<string, string> = {
   laptop: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=85',
@@ -48,18 +11,6 @@ const productImages: Record<string, string> = {
   keyboard: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=900&q=85',
   monitor: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=85',
 };
-
-const api: AxiosInstance = axios.create({
-  baseURL: API_URL,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 const formatCurrency = (amount: number | string): string => {
   const numericAmount = Number(amount);
@@ -83,67 +34,14 @@ function App(): React.JSX.Element {
   const [password, setPassword] = useState<string>('');
 
   const loginMutation = useMutation<LoginResponse, Error, { email: string; password: string }>({
-    mutationFn: async (credentials) => {
-      const { data } = await axios.post<LoginResponse>(`${API_URL}/api/v1/auth/login`, credentials);
-      return data;
-    },
+    mutationFn: login,
     onSuccess: (data) => {
       localStorage.setItem('token', data.token);
       setToken(data.token);
     },
   });
 
-  const productsQuery = useQuery<Product[]>({
-    queryKey: ['products'],
-    queryFn: async () => {
-      const { data } = await api.get<{ products: Product[] }>('/api/v1/products');
-      return data.products;
-    },
-  });
-
-  const cartQuery = useQuery<CartResponse>({
-    queryKey: ['cart'],
-    queryFn: async () => {
-      const { data } = await api.get<CartResponse>('/api/v1/cart');
-      return data;
-    },
-    enabled: !!token,
-  });
-
-  const ordersQuery = useQuery<Order[]>({
-    queryKey: ['orders'],
-    queryFn: async () => {
-      const { data } = await api.get<{ orders: Order[] }>('/api/v1/orders');
-      return data.orders;
-    },
-    enabled: !!token,
-    refetchInterval: 5000, // Poll for status updates
-  });
-
-  const addToCartMutation = useMutation({
-    mutationFn: async (product: Product) => {
-      await api.post('/api/v1/cart/items', {
-        productId: product._id,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-      });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cart'] }),
-  });
-
-  const checkoutMutation = useMutation({
-    mutationFn: async (cartItems: CartItem[]) => {
-      await api.post('/api/v1/orders', {
-        items: cartItems,
-      });
-      await api.delete('/api/v1/cart');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cart'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-    },
-  });
+  const { productsQuery, cartQuery, ordersQuery, addToCartMutation, checkoutMutation } = useStoreQueries(!!token);
 
   const handleLogin = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();

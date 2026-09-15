@@ -89,6 +89,34 @@ services:
     networks:
       - ecommerce-net
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - ecommerce-net
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    ports:
+      - "8082:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
   # ─── Application Services ───
 
   api-gateway:
@@ -283,6 +311,7 @@ volumes:
   mongo_data:
   redis_data:
   kafka_data:
+  pgadmin_data:
 
 networks:
   ecommerce-net:

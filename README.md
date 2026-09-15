@@ -8,45 +8,66 @@ A production-grade, event-driven e-commerce platform built with **Node.js micros
 
 ## 🏗️ Architecture
 
-```
-  Client Layer                  Edge Layer                 Service Layer
+```mermaid
+flowchart LR
+   browser["Browser"] --> frontend["React + Vite<br/>:3000"]
+   frontend -->|HTTP /api/v1| gateway["API Gateway<br/>:4000<br/>JWT + rate limits"]
 
-  ┌──────────────┐         ┌────────────────┐
-  │ React + Vite │ HTTP    │  API Gateway   │
-  │    :3000     ├────────►│ :4000          │
-  └──────────────┘         │ JWT + rate     │
-               │ limiting       │
-               └───────┬────────┘
-                    │ proxy
-     ┌──────────────────────────┼──────────────────────────┐
-     │                          │                          │
-  ┌─────▼─────┐  ┌────────────┐  ┌▼───────────┐  ┌───────────▼──────┐
-  │ Auth      │  │ Product    │  │ Cart       │  │ Order             │
-  │ :4001     │  │ :4002      │  │ :4003      │  │ :4004             │
-  └─────┬─────┘  └─────┬──────┘  └────┬───────┘  └───────────┬──────┘
-     │              │              │                      │
-  ┌─────▼─────┐  ┌─────▼──────┐  ┌────▼─────┐  ┌────────────▼──────┐
-  │ Inventory │  │ Payment    │  │ Redis    │  │ Notification       │
-  │ :4005     │  │ :4006      │  │ sessions │  │ :4007              │
-  └─────┬─────┘  └─────┬──────┘  └──────────┘  └────────────┬──────┘
-     │              │                                   │
-     └──────────────┴──────────────┬────────────────────┘
-                    │ events
-               ┌───────▼────────┐
-               │ Apache Kafka   │
-               │ event backbone │
-               └───────┬────────┘
-                    │
-    ┌──────────────────────────────┼──────────────────────────────┐
-    │                              │                              │
-  ┌────▼─────┐  ┌──────────────┐  ┌──▼─────────┐  ┌──────────────────┐
-  │ Auth DB  │  │ Product DB   │  │ Order DB   │  │ Inventory/Payment│
-  │ Postgres │  │ MongoDB      │  │ Postgres   │  │ PostgreSQL       │
-  └──────────┘  └──────────────┘  └────────────┘  └──────────────────┘
+   subgraph services[Application services]
+      auth["Auth<br/>:4001"]
+      product["Product<br/>:4002"]
+      cart["Cart<br/>:4003"]
+      order["Order<br/>:4004"]
+      inventory["Inventory<br/>:4005"]
+      payment["Payment<br/>:4006"]
+      notification["Notification<br/>:4007"]
+   end
 
-  Checkout events: order.created -> inventory.reserved -> payment.completed
-          inventory.rejected / payment.failed -> order.cancelled
+   gateway --> auth
+   gateway --> product
+   gateway --> cart
+   gateway --> order
+   gateway --> inventory
+   gateway --> payment
+
+   subgraph data[Service-owned data]
+      authdb[(Auth DB<br/>PostgreSQL)]
+      productdb[(Product DB<br/>MongoDB)]
+      orderdb[(Order DB<br/>PostgreSQL)]
+      inventorydb[(Inventory DB<br/>PostgreSQL)]
+      paymentdb[(Payment DB<br/>PostgreSQL)]
+      redis[(Redis<br/>cart + cache)]
+   end
+
+   auth --> authdb
+   product --> productdb
+   product --> redis
+   cart --> redis
+   order --> orderdb
+   inventory --> inventorydb
+   payment --> paymentdb
+
+   kafka{{"Apache Kafka<br/>event backbone"}}
+   order -. "order.created" .-> kafka
+   kafka -. "inventory events" .-> inventory
+   kafka -. "payment events" .-> payment
+   kafka -. "order status" .-> order
+   kafka -. "notifications" .-> notification
+
+   classDef edge fill:#246c68,color:#fff,stroke:#194d4a,stroke-width:2px
+   classDef service fill:#fffdf9,color:#1e2421,stroke:#dedbd3
+   classDef data fill:#f4f1eb,color:#1e2421,stroke:#dedbd3
+   classDef event fill:#e9c46a,color:#1e2421,stroke:#b08b2e,stroke-width:2px
+   class gateway edge
+   class auth,product,cart,order,inventory,payment,notification service
+   class authdb,productdb,orderdb,inventorydb,paymentdb,redis data
+   class kafka event
 ```
+
+**Checkout event flow:** `order.created` -> `inventory.reserved` ->
+`payment.completed` -> order confirmation. Rejection or payment failure emits a
+compensating event that releases inventory and cancels the order. Solid arrows
+represent synchronous HTTP/data access; dotted arrows represent Kafka events.
 
 Each service owns its data and communicates through the gateway for HTTP requests
 and Kafka for asynchronous checkout events. Redis is shared by the cart service
@@ -244,7 +265,8 @@ service you changed, such as `api-gateway`, `auth-service`, or `frontend`:
 
 ```bash
 docker compose build SERVICE_NAME
-docker compose up -d --no-deps SERVICE_NAME
+docker compose up -d --no-deps --force-recreate SERVICE_NAME
+docker image prune -f
 docker compose ps SERVICE_NAME
 ```
 
@@ -252,9 +274,29 @@ Example for the API gateway:
 
 ```bash
 docker compose build api-gateway
-docker compose up -d --no-deps api-gateway
+docker compose up -d --no-deps --force-recreate api-gateway
+docker image prune -f
 curl http://localhost:4000/health
 ```
+
+For a local frontend typecheck and production build:
+
+```bash
+npm run build --workspace=packages/frontend
+```
+
+This runs TypeScript validation followed by the Vite production build. After
+changing frontend code for Docker, rebuild and rerun only the frontend:
+
+```bash
+docker compose build frontend
+docker compose up -d --no-deps --force-recreate frontend
+docker image prune -f
+```
+
+The prune command removes old untagged (`<none>:<none>`) image versions created
+by replacing the frontend image. It does not remove the running image or any
+named database volume.
 
 `--no-deps` prevents Compose from restarting the other services. The updated
 service is recreated from the new image while its existing dependencies remain
@@ -267,14 +309,16 @@ force a clean image for that service:
 
 ```bash
 docker compose build --no-cache SERVICE_NAME
-docker compose up -d --no-deps SERVICE_NAME
+docker compose up -d --no-deps --force-recreate SERVICE_NAME
+docker image prune -f
 ```
 
 For example, after changing the seed dependencies:
 
 ```bash
 docker compose build order-service
-docker compose up -d --no-deps order-service
+docker compose up -d --no-deps --force-recreate order-service
+docker image prune -f
 ```
 
 #### Rerun the complete stack
@@ -300,6 +344,33 @@ docker compose up -d --build
 - Frontend: http://localhost:3000
 - API Gateway: http://localhost:4000
 - Kafka UI: http://localhost:8081
+- pgAdmin: http://localhost:5050
+- Mongo Express: http://localhost:8082
+
+### Database Web UIs
+
+The Compose stack includes browser-based database tools:
+
+| Tool | URL | Login or connection |
+|------|-----|---------------------|
+| pgAdmin | http://localhost:5050 | `admin@example.com` / `admin` |
+| Mongo Express | http://localhost:8082 | No web login configured for local development |
+
+In pgAdmin, register a server with these values:
+
+| Field | Value |
+|-------|-------|
+| Host name/address | `postgres` |
+| Port | `5432` |
+| Maintenance database | `auth_db` |
+| Username | `ecommerce` |
+| Password | `ecommerce_pass` |
+
+Use `postgres` as the host because pgAdmin runs inside the Compose network. Do
+not use `localhost` from inside the pgAdmin container.
+
+Mongo Express connects automatically to the `mongo` container and displays the
+`product_db` database after the product seed has run.
 
 ### Seeded Development Account
 
@@ -321,8 +392,20 @@ development credentials only. Set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` i
 # Stop containers and keep database data
 docker compose down
 
+# Stop one container without removing it
+docker compose stop frontend
+docker compose stop pgadmin
+docker compose stop mongo-express
+docker compose stop order-service
+
 # Start existing containers again
 docker compose up -d
+
+# Start one stopped container again
+docker compose start frontend
+
+# Stop the infrastructure-only stack
+docker compose -f docker-compose.infra.yml down
 
 # Follow logs for all services
 docker compose logs -f
@@ -330,13 +413,19 @@ docker compose logs -f
 # Follow logs for one service
 docker compose logs -f order-service
 
-# Restart one service
-docker compose restart order-service
+# Recreate one service from its current image
+docker compose up -d --no-deps --force-recreate order-service
+docker image prune -f
 
 # Stop containers and delete all database volumes (destructive)
 docker compose down -v
+
+# Delete infrastructure-only containers and their volumes (destructive)
+docker compose -f docker-compose.infra.yml down -v
 ```
 
+`docker compose down` removes containers but keeps database volumes. Use
+`docker compose stop SERVICE_NAME` when you only want to stop one container.
 After `docker compose down -v`, run `docker compose up -d` and the seed command
 again. PostgreSQL creates the separate databases during first initialization.
 
@@ -363,7 +452,8 @@ Common issues:
    conversion was applied. Prefix container commands with `MSYS_NO_PATHCONV=1`.
 - `Cannot find module 'mongoose'` or `Cannot find module 'bcryptjs'` while
    seeding means the order image is stale. Run `docker compose build order-service`
-   followed by `docker compose up -d order-service`.
+   followed by `docker compose up -d --no-deps --force-recreate order-service`
+   and `docker image prune -f`.
 - A service stuck in `starting` usually needs a few seconds for its database or
    Kafka dependency. Check `docker compose ps` and the service logs.
 - If PostgreSQL databases are missing after changing `POSTGRES_MULTIPLE_DATABASES`,
