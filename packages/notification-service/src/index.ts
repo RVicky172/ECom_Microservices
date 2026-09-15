@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createLogger } from '@ecommerce/shared/src/logger';
-import { correlationIdMiddleware } from '@ecommerce/shared/src/middleware/correlationId';
+import { createLogger, correlationId } from '@ecommerce/shared';
 import { startConsumer } from './events/consumer';
 
 const logger = createLogger('notification-service');
@@ -19,7 +18,7 @@ declare global {
 
 app.use(cors());
 app.use(express.json());
-app.use(correlationIdMiddleware);
+app.use(correlationId);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });

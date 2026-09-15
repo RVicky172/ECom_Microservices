@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
+import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
+export const JWT_SECRET: Secret = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
 
 export interface JwtPayload {
   id: string;
@@ -19,7 +19,9 @@ export const verifyToken = (token: string): JwtPayload => {
  * Signs a JWT with the given payload.
  */
 export const signToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-  });
+  const options: SignOptions = {
+    expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as SignOptions['expiresIn'],
+  };
+
+  return jwt.sign(payload, JWT_SECRET, options);
 };

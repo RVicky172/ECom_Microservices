@@ -10,13 +10,15 @@ const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(correlationId);
-app.use(express.json());
 
 // Global rate limiting
 app.use(rateLimiter(logger));
 
 // Setup all service reverse proxies
 setupProxies(app, logger);
+
+// Parse bodies only after proxy routes have forwarded them.
+app.use(express.json());
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

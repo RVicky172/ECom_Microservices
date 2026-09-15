@@ -1,9 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
-import { createLogger } from '@ecommerce/shared/src/logger';
-import { correlationIdMiddleware } from '@ecommerce/shared/src/middleware/correlationId';
-import { errorHandlerMiddleware } from '@ecommerce/shared/src/middleware/errorHandler';
+import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
 import productRoutes from './routes/productRoutes';
 
 const logger = createLogger('product-service');
@@ -21,7 +19,7 @@ declare global {
 
 app.use(cors());
 app.use(express.json());
-app.use(correlationIdMiddleware);
+app.use(correlationId);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });
@@ -34,7 +32,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1/products', productRoutes);
 
-app.use(errorHandlerMiddleware(logger));
+app.use(errorHandler(logger));
 
 const start = async (): Promise<void> => {
   const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/product_db';

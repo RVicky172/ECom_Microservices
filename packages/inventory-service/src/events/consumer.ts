@@ -1,5 +1,4 @@
-import { createKafkaClient, createConsumer, createProducer } from '@ecommerce/shared/src/kafka';
-import { KafkaTopics, EventTypes } from '@ecommerce/shared/src/events';
+import { createKafkaClient, createConsumer, createProducer, KafkaTopics, EventTypes } from '@ecommerce/shared';
 import { db } from '../models/inventoryModel';
 import { reserveStock, releaseStock, finalizeStock } from '../services/inventoryService';
 import { v4 as uuidv4 } from 'uuid';

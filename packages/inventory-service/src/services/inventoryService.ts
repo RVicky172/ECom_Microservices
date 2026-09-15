@@ -1,5 +1,5 @@
 import { db } from '../models/inventoryModel';
-import { NotFoundError, ValidationError } from '@ecommerce/shared/src/errors';
+import { NotFoundError, ValidationError } from '@ecommerce/shared';
 
 interface StockLevel {
   product_id: string;

@@ -15,7 +15,9 @@
     "axios": "^1.7.7",
     "joi": "^17.13.3",
     "uuid": "^9.0.1",
-    "cors": "^2.8.5"
+    "cors": "^2.1.5",
+    "mongoose": "^9.10.1",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

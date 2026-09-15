@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { db } from '../models/userModel';
-import { signToken } from '@ecommerce/shared/src/jwt';
-import { ValidationError, NotFoundError, ConflictError } from '@ecommerce/shared/src/errors';
+import { signToken, ValidationError, NotFoundError, ConflictError } from '@ecommerce/shared';
 
 interface RegisterInput {
   email: string;

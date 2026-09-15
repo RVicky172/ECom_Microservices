@@ -15,7 +15,7 @@ COPY packages/shared/ ./packages/shared/
 COPY packages/order-service/ ./packages/order-service/
 COPY scripts/ ./scripts/
 
-RUN npm run build --workspace=packages/order-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/order-service
 
 EXPOSE 4004
 USER node

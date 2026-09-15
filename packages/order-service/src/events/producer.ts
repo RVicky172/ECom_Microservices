@@ -1,5 +1,4 @@
-import { createKafkaClient, createProducer } from '@ecommerce/shared/src/kafka';
-import { KafkaTopics } from '@ecommerce/shared/src/events';
+import { createKafkaClient, createProducer, KafkaTopics } from '@ecommerce/shared';
 import { db } from '../models/orderModel';
 
 let producer: any = null;

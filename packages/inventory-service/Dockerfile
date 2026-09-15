@@ -14,7 +14,7 @@ RUN npm install --workspace=packages/inventory-service --workspace=packages/shar
 COPY packages/shared/ ./packages/shared/
 COPY packages/inventory-service/ ./packages/inventory-service/
 
-RUN npm run build --workspace=packages/inventory-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/inventory-service
 
 EXPOSE 4005
 USER node

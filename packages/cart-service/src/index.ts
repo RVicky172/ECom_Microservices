@@ -1,8 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createLogger } from '@ecommerce/shared/src/logger';
-import { correlationIdMiddleware } from '@ecommerce/shared/src/middleware/correlationId';
-import { errorHandlerMiddleware } from '@ecommerce/shared/src/middleware/errorHandler';
+import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
 import cartRoutes from './routes/cartRoutes';
 
 const logger = createLogger('cart-service');
@@ -20,7 +18,7 @@ declare global {
 
 app.use(cors());
 app.use(express.json());
-app.use(correlationIdMiddleware);
+app.use(correlationId);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });
@@ -33,7 +31,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1/cart', cartRoutes);
 
-app.use(errorHandlerMiddleware(logger));
+app.use(errorHandler(logger));
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, 'Cart Service started');

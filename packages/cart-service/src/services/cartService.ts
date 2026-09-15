@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { NotFoundError } from '@ecommerce/shared/src/errors';
+import { NotFoundError } from '@ecommerce/shared';
 
 interface CartItem {
   productId: string;

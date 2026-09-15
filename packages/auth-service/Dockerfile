@@ -14,7 +14,7 @@ RUN npm install --workspace=packages/auth-service --workspace=packages/shared
 COPY packages/shared/ ./packages/shared/
 COPY packages/auth-service/ ./packages/auth-service/
 
-RUN npm run build --workspace=packages/auth-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/auth-service
 
 EXPOSE 4001
 USER node

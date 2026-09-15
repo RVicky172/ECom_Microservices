@@ -1,5 +1,4 @@
-import { createKafkaClient, createConsumer } from '@ecommerce/shared/src/kafka';
-import { KafkaTopics } from '@ecommerce/shared/src/events';
+import { createKafkaClient, createConsumer, KafkaTopics } from '@ecommerce/shared';
 import * as notificationService from '../services/notificationService';
 
 const processedEvents = new Set<string>(); // In-memory idempotency for this dummy project

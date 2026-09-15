@@ -129,39 +129,181 @@ and the product cache; PostgreSQL databases remain logically separated per servi
 - [Node.js](https://nodejs.org/) (v20 LTS) — only needed for local dev without Docker
 - [Git](https://git-scm.com/)
 
-### Run with Docker Compose (Recommended)
+### Run the Complete Platform with Docker Compose
+
+The commands below start PostgreSQL, MongoDB, Redis, Kafka, all backend services,
+the API gateway, Kafka UI, and the frontend. Run them from the repository root.
+
+#### 1. Create the environment file
 
 ```bash
-# Clone and enter the project
-git clone <repository-url>
-cd Microservices
-
-# Create the local environment file
 cp .env.example .env
-
-# Install host dependencies (needed for seed/test/local development)
-npm install
-
-# Build and start the complete platform
-docker compose up --build
-
-# In a second terminal, seed products, inventory, and the development admin
-docker compose exec order-service node /app/scripts/seed-data.js
 ```
 
-On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp .env.example .env`.
+PowerShell equivalent:
 
-To stop the platform, press `Ctrl+C` or run `docker compose down`. Add `-v` only
-when you intentionally want to delete the local database volumes.
+```powershell
+Copy-Item .env.example .env
+```
 
-**Services will be available at:**
+The values in `.env.example` use Docker Compose service names such as `postgres`,
+`mongo`, `redis`, and `kafka`. Keep those values when running the complete stack.
+
+#### 2. Build the images
+
+```bash
+docker compose build
+```
+
+Use `docker compose build --no-cache` only when you need to force a completely
+clean image build.
+
+#### 3. Start the platform
+
+```bash
+docker compose up -d
+```
+
+The `-d` flag keeps the services running in the background. To watch startup logs
+instead, use `docker compose up`.
+
+#### 4. Check service status
+
+```bash
+docker compose ps
+```
+
+Wait until the services with health checks show `healthy`. You can also check a
+service directly:
+
+```bash
+curl http://localhost:4000/health
+curl http://localhost:4001/health
+curl http://localhost:4002/health
+curl http://localhost:4003/health
+curl http://localhost:4004/health
+curl http://localhost:4005/health
+curl http://localhost:4006/health
+curl http://localhost:4007/health
+```
+
+#### 5. Seed development data
+
+The seed creates sample products, inventory stock, and a development admin user.
+The script runs inside `order-service`, so it must use Docker network hostnames.
+
+Git Bash requires `MSYS_NO_PATHCONV=1`; otherwise it rewrites `/app/scripts/...`
+into a Windows path before Docker receives the command:
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose exec \
+   -e MONGO_URI=mongodb://mongo:27017/product_db \
+   -e POSTGRES_HOST=postgres \
+   order-service node /app/scripts/seed-data.js
+```
+
+PowerShell:
+
+```powershell
+docker compose exec `
+   -e MONGO_URI=mongodb://mongo:27017/product_db `
+   -e POSTGRES_HOST=postgres `
+   order-service node /app/scripts/seed-data.js
+```
+
+The seed is safe to run more than once. It replaces the sample products and
+inventory, but does not overwrite an existing admin account or password.
+
+### Start, Update, and Rerun Containers
+
+Use these commands when the stack is already configured with `.env`.
+
+#### Start all containers for the first time
+
+```bash
+# Build every application image
+docker compose build
+
+# Start infrastructure and all application services in the background
+docker compose up -d
+
+# Check container state and health checks
+docker compose ps
+```
+
+For a one-command start that also rebuilds changed images:
+
+```bash
+docker compose up -d --build
+```
+
+#### Update and rerun only one service
+
+After changing a service source file, replace `SERVICE_NAME` with the Compose
+service you changed, such as `api-gateway`, `auth-service`, or `frontend`:
+
+```bash
+docker compose build SERVICE_NAME
+docker compose up -d --no-deps SERVICE_NAME
+docker compose ps SERVICE_NAME
+```
+
+Example for the API gateway:
+
+```bash
+docker compose build api-gateway
+docker compose up -d --no-deps api-gateway
+curl http://localhost:4000/health
+```
+
+`--no-deps` prevents Compose from restarting the other services. The updated
+service is recreated from the new image while its existing dependencies remain
+running.
+
+#### Update one service after dependency changes
+
+When you change a service `package.json`, Dockerfile, or shared package code,
+force a clean image for that service:
+
+```bash
+docker compose build --no-cache SERVICE_NAME
+docker compose up -d --no-deps SERVICE_NAME
+```
+
+For example, after changing the seed dependencies:
+
+```bash
+docker compose build order-service
+docker compose up -d --no-deps order-service
+```
+
+#### Rerun the complete stack
+
+Use this when shared code, Compose configuration, environment variables, or
+multiple services changed:
+
+```bash
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+To stop and recreate every container while preserving database volumes:
+
+```bash
+docker compose down
+docker compose up -d --build
+```
+
+#### 6. Open the applications
+
 - Frontend: http://localhost:3000
 - API Gateway: http://localhost:4000
 - Kafka UI: http://localhost:8081
 
 ### Seeded Development Account
 
-The seed command creates this admin account if it does not already exist:
+The default seed account is:
 
 | Field | Value |
 |-------|-------|
@@ -169,23 +311,80 @@ The seed command creates this admin account if it does not already exist:
 | Password | `admin` |
 | Role | `admin` |
 
-Use it with `POST /api/v1/auth/login` through the API Gateway. These are local development credentials only. Set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in `.env` before seeding to use different values, and never use the defaults outside a local environment.
+Use it with `POST /api/v1/auth/login` through the API Gateway. These are local
+development credentials only. Set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in
+`.env` before seeding to use different values.
 
-The seed is safe to run more than once: it replaces the sample products and inventory, but does not overwrite an existing admin account or password.
+### Stop, Restart, and Reset
+
+```bash
+# Stop containers and keep database data
+docker compose down
+
+# Start existing containers again
+docker compose up -d
+
+# Follow logs for all services
+docker compose logs -f
+
+# Follow logs for one service
+docker compose logs -f order-service
+
+# Restart one service
+docker compose restart order-service
+
+# Stop containers and delete all database volumes (destructive)
+docker compose down -v
+```
+
+After `docker compose down -v`, run `docker compose up -d` and the seed command
+again. PostgreSQL creates the separate databases during first initialization.
+
+### Troubleshooting Docker Compose
+
+```bash
+# Show stopped containers and exit codes
+docker compose ps -a
+
+# Inspect recent logs
+docker compose logs --tail=150 api-gateway order-service
+
+# Rebuild after source or dependency changes
+docker compose build
+docker compose up -d
+
+# Validate the rendered Compose configuration
+docker compose config
+```
+
+Common issues:
+
+- `Cannot find module '/app/C:/Program Files/Git/app/...` means Git Bash path
+   conversion was applied. Prefix container commands with `MSYS_NO_PATHCONV=1`.
+- `Cannot find module 'mongoose'` or `Cannot find module 'bcryptjs'` while
+   seeding means the order image is stale. Run `docker compose build order-service`
+   followed by `docker compose up -d order-service`.
+- A service stuck in `starting` usually needs a few seconds for its database or
+   Kafka dependency. Check `docker compose ps` and the service logs.
+- If PostgreSQL databases are missing after changing `POSTGRES_MULTIPLE_DATABASES`,
+   run `docker compose down -v` and start the stack again. Initialization scripts
+   run only when the PostgreSQL data volume is created.
 
 ### Run Infrastructure Only (for local Node.js dev)
 
+Use this mode when running application services directly on the host.
+
 ```bash
-# Install packages from the monorepo root
+# Install host dependencies
 npm install
 
-# Start only Kafka, Redis, PostgreSQL, MongoDB, and Kafka UI
+# Start PostgreSQL, MongoDB, Redis, Kafka, and Kafka UI
 docker compose -f docker-compose.infra.yml up -d
 
 # Build all TypeScript services
 npm run build --workspaces --if-present
 
-# Start services in separate terminals
+# Start each service in a separate terminal
 npm run dev:auth
 npm run dev:product
 npm run dev:cart

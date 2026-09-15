@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 
 declare global {
@@ -13,10 +13,12 @@ declare global {
 /**
  * Correlation ID middleware.
  */
-export const correlationId = (req: Request, res: Response, next: NextFunction) => {
+export const correlationId: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
   const id = (req.headers['x-correlation-id'] as string) || uuidv4();
   req.headers['x-correlation-id'] = id;
   req.correlationId = id;
   res.setHeader('x-correlation-id', id);
   next();
 };
+
+export const correlationIdMiddleware: RequestHandler = correlationId;

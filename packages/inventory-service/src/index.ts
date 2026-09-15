@@ -1,8 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createLogger } from '@ecommerce/shared/src/logger';
-import { correlationIdMiddleware } from '@ecommerce/shared/src/middleware/correlationId';
-import { errorHandlerMiddleware } from '@ecommerce/shared/src/middleware/errorHandler';
+import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
 import inventoryRoutes from './routes/inventoryRoutes';
 import { runMigrations } from './models/inventoryModel';
 import { startConsumer } from './events/consumer';
@@ -22,7 +20,7 @@ declare global {
 
 app.use(cors());
 app.use(express.json());
-app.use(correlationIdMiddleware);
+app.use(correlationId);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });
@@ -35,7 +33,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1/inventory', inventoryRoutes);
 
-app.use(errorHandlerMiddleware(logger));
+app.use(errorHandler(logger));
 
 const start = async (): Promise<void> => {
   await runMigrations();

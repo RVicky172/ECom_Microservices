@@ -1,5 +1,4 @@
-import { createKafkaClient, createConsumer } from '@ecommerce/shared/src/kafka';
-import { KafkaTopics, OrderStatus } from '@ecommerce/shared/src/events';
+import { createKafkaClient, createConsumer, KafkaTopics, OrderStatus } from '@ecommerce/shared';
 import { updateOrderStatus } from '../services/orderService';
 
 /**

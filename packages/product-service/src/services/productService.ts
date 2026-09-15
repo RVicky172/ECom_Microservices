@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import Product, { IProduct } from '../models/productModel';
-import { NotFoundError } from '@ecommerce/shared/src/errors';
+import { NotFoundError } from '@ecommerce/shared';
 
 interface QueryParams {
   category?: string;

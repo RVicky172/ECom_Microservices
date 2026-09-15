@@ -1,11 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
+import { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import { Logger } from 'pino';
 import { AppError } from '../errors';
 
 /**
  * Centralized error-handling middleware.
  */
-export const errorHandler = (logger: Logger) => {
+export const errorHandler = (logger: Logger): ErrorRequestHandler => {
   return (err: Error | AppError, req: Request, res: Response, _next: NextFunction) => {
     const statusCode = err instanceof AppError ? err.statusCode : 500;
     const correlationId = req.headers['x-correlation-id'] || 'unknown';
@@ -33,3 +33,5 @@ export const errorHandler = (logger: Logger) => {
     res.status(statusCode).json(response);
   };
 };
+
+export const errorHandlerMiddleware: (logger: Logger) => ErrorRequestHandler = errorHandler;

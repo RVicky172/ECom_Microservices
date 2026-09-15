@@ -14,7 +14,7 @@ RUN npm install --workspace=packages/cart-service --workspace=packages/shared
 COPY packages/shared/ ./packages/shared/
 COPY packages/cart-service/ ./packages/cart-service/
 
-RUN npm run build --workspace=packages/cart-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/cart-service
 
 EXPOSE 4003
 USER node

@@ -14,7 +14,7 @@ RUN npm install --workspace=packages/notification-service --workspace=packages/s
 COPY packages/shared/ ./packages/shared/
 COPY packages/notification-service/ ./packages/notification-service/
 
-RUN npm run build --workspace=packages/notification-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/notification-service
 
 EXPOSE 4007
 USER node

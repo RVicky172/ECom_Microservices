@@ -14,7 +14,7 @@ RUN npm install --workspace=packages/payment-service --workspace=packages/shared
 COPY packages/shared/ ./packages/shared/
 COPY packages/payment-service/ ./packages/payment-service/
 
-RUN npm run build --workspace=packages/payment-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/payment-service
 
 EXPOSE 4006
 USER node

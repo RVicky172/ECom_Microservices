@@ -14,7 +14,7 @@ RUN npm install --workspace=packages/product-service --workspace=packages/shared
 COPY packages/shared/ ./packages/shared/
 COPY packages/product-service/ ./packages/product-service/
 
-RUN npm run build --workspace=packages/product-service
+RUN npm run build --workspace=packages/shared && npm run build --workspace=packages/product-service
 
 EXPOSE 4002
 USER node

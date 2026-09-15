@@ -1,5 +1,5 @@
 import { db } from '../models/paymentModel';
-import { ConflictError, NotFoundError } from '@ecommerce/shared/src/errors';
+import { ConflictError, NotFoundError } from '@ecommerce/shared';
 
 interface Payment {
   id: string;

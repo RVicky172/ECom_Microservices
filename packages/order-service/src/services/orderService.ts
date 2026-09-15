@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../models/orderModel';
-import { OrderStatus, VALID_ORDER_TRANSITIONS, EventTypes } from '@ecommerce/shared/src/events';
-import { NotFoundError, ValidationError } from '@ecommerce/shared/src/errors';
+import { OrderStatus, VALID_ORDER_TRANSITIONS, EventTypes, NotFoundError, ValidationError } from '@ecommerce/shared';
 
 interface OrderItem {
   productId: string;
