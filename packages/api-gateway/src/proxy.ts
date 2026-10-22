@@ -45,6 +45,7 @@ export const setupProxies = (app: Express, logger: Logger) => {
   };
 
   // Auth service routes (public)
+  app.use('/api/v1/auth/profile', requireAuth);
   app.use('/api/v1/auth', createProxy(SERVICES.auth, '/api/v1/auth'));
 
   // Product service routes (public read, authenticated write - ideally handled in product service)

@@ -36,4 +36,17 @@ export const runMigrations = async (): Promise<void> => {
     });
     console.log('Created users table');
   }
+
+  const hasRefreshSessions = await db.schema.hasTable('refresh_sessions');
+  if (!hasRefreshSessions) {
+    await db.schema.createTable('refresh_sessions', (table) => {
+      table.uuid('id').primary().defaultTo(db.raw('gen_random_uuid()'));
+      table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
+      table.string('token_hash', 64).unique().notNullable();
+      table.timestamp('expires_at').notNullable();
+      table.timestamp('created_at').defaultTo(db.fn.now());
+      table.index(['user_id']);
+    });
+    console.log('Created refresh_sessions table');
+  }
 };

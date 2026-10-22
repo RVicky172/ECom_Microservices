@@ -1,6 +1,31 @@
 import type { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
+import { REFRESH_COOKIE_NAME, UnauthorizedError } from '@ecommerce/shared';
 import * as authService from '../services/authService';
+
+const REFRESH_TOKEN_TTL_SECONDS = Number(process.env.REFRESH_TOKEN_TTL_SECONDS || 604800);
+const baseCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+};
+const refreshCookieOptions = {
+  ...baseCookieOptions,
+  maxAge: REFRESH_TOKEN_TTL_SECONDS * 1000,
+  path: '/api/v1/auth',
+};
+
+const readCookie = (request: Request, name: string): string | undefined =>
+  request.headers.cookie
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+
+const setSessionCookies = (response: Response, result: Awaited<ReturnType<typeof authService.login>>): void => {
+  response.cookie(REFRESH_COOKIE_NAME, result.refreshToken, refreshCookieOptions);
+  response.clearCookie('access_token', { ...baseCookieOptions, path: '/' });
+};
 
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -22,7 +47,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     }
 
     const result = await authService.register(value);
-    res.status(201).json(result);
+    setSessionCookies(res, result);
+    res.status(201).json({ user: result.user, accessToken: result.accessToken });
   } catch (err) {
     next(err);
   }
@@ -37,7 +63,38 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     }
 
     const result = await authService.login(value);
-    res.json(result);
+    setSessionCookies(res, result);
+    res.json({ user: result.user, accessToken: result.accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const refreshToken = readCookie(req, REFRESH_COOKIE_NAME);
+    if (!refreshToken) {
+      throw new UnauthorizedError('Missing refresh token');
+    }
+
+    const result = await authService.rotateRefreshToken(refreshToken);
+    setSessionCookies(res, result);
+    res.json({ accessToken: result.accessToken });
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      res.clearCookie('access_token', { ...baseCookieOptions, path: '/' });
+      res.clearCookie(REFRESH_COOKIE_NAME, { ...baseCookieOptions, path: '/api/v1/auth' });
+    }
+    next(err);
+  }
+};
+
+export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    await authService.revokeRefreshToken(readCookie(req, REFRESH_COOKIE_NAME));
+    res.clearCookie('access_token', { ...baseCookieOptions, path: '/' });
+    res.clearCookie(REFRESH_COOKIE_NAME, { ...baseCookieOptions, path: '/api/v1/auth' });
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

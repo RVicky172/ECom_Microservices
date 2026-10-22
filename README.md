@@ -496,10 +496,26 @@ services run outside Docker. Use `docker compose down` to stop the infrastructur
 
 ### Auth
 ```
-POST /api/v1/auth/register   — Register a new user
-POST /api/v1/auth/login      — Login, returns JWT
-GET  /api/v1/auth/profile     — Get current user (requires JWT)
+POST /api/v1/auth/register   — Register a user and return an access token, set refresh cookie
+POST /api/v1/auth/login      — Login and return an access token, set refresh cookie
+POST /api/v1/auth/refresh    — Rotate the refresh token and issue a new access token
+POST /api/v1/auth/logout     — Revoke the refresh session and clear auth cookies
+GET  /api/v1/auth/profile    — Get the current user (requires Bearer access token)
 ```
+
+The API gateway accepts browser requests from `FRONTEND_ORIGINS`, a comma-separated
+list of trusted frontend origins (default: `http://localhost:3000`). It uses this
+allowlist for credentialed CORS and rejects state-changing requests without a
+matching `Origin`. The short-lived access JWT (15 minutes by default) and the
+rotating refresh token (7 days by default) use different storage: the frontend
+holds the access JWT in memory and sends it as a Bearer token, while only the
+refresh token is stored in an `HttpOnly`, `SameSite=Lax` cookie. The refresh
+cookie is marked `Secure` when `NODE_ENV=production`, so production deployments
+must use HTTPS. Refresh tokens are stored hashed in the auth database and revoked
+on logout. The frontend retries a request once after refreshing an expired access
+token; a page reload starts a new access token from the refresh cookie.
+Configure lifetimes with `ACCESS_TOKEN_TTL_SECONDS` and
+`REFRESH_TOKEN_TTL_SECONDS`.
 
 ### Products
 ```

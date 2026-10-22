@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { login } from './api/storeApi';
+import React, { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { setAccessToken } from './api/client';
+import { getProfile, login, logout } from './api/storeApi';
 import { useStoreQueries } from './hooks/useStoreQueries';
-import type { LoginResponse, Product } from './types/store';
+import type { AuthUser, LoginResponse, Product } from './types/store';
 import './styles.css';
 
 const productImages: Record<string, string> = {
@@ -29,19 +30,45 @@ const getStatusClass = (status: string): string => {
 
 function App(): React.JSX.Element {
   const queryClient = useQueryClient();
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  useEffect(() => {
+    const handleSessionExpired = (): void => {
+      queryClient.setQueryData<AuthUser | null>(['profile'], null);
+      queryClient.removeQueries({ queryKey: ['cart'] });
+      queryClient.removeQueries({ queryKey: ['orders'] });
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, [queryClient]);
+
+  const profileQuery = useQuery({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    retry: false,
+  });
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
   const loginMutation = useMutation<LoginResponse, Error, { email: string; password: string }>({
     mutationFn: login,
     onSuccess: (data) => {
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
+      setAccessToken(data.accessToken);
+      queryClient.setQueryData<AuthUser>(['profile'], data.user);
     },
   });
 
-  const { productsQuery, cartQuery, ordersQuery, addToCartMutation, checkoutMutation } = useStoreQueries(!!token);
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSuccess: () => {
+      setAccessToken(null);
+      queryClient.setQueryData<AuthUser | null>(['profile'], null);
+      queryClient.removeQueries({ queryKey: ['cart'] });
+      queryClient.removeQueries({ queryKey: ['orders'] });
+    },
+  });
+
+  const isAuthenticated = !!profileQuery.data;
+  const { productsQuery, cartQuery, ordersQuery, addToCartMutation, checkoutMutation } = useStoreQueries(isAuthenticated);
 
   const handleLogin = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -49,12 +76,14 @@ function App(): React.JSX.Element {
   };
 
   const handleLogout = (): void => {
-    localStorage.removeItem('token');
-    setToken(null);
-    queryClient.clear();
+    logoutMutation.mutate();
   };
 
-  if (!token) {
+  if (profileQuery.isLoading) {
+    return <main className="auth-screen"><p role="status">Checking your session...</p></main>;
+  }
+
+  if (!isAuthenticated) {
     return (
         <main className="auth-screen">
           <section className="auth-showcase">
@@ -97,6 +126,7 @@ function App(): React.JSX.Element {
     const products = productsQuery.data ?? [];
     const cart = cartQuery.data;
     const orders = ordersQuery.data ?? [];
+    const user = profileQuery.data;
 
     return (
       <div className="app-shell">
@@ -110,13 +140,14 @@ function App(): React.JSX.Element {
           </nav>
           <div className="sidebar-bottom">
             <div className="support-note"><span className="support-dot" />All systems operational</div>
-            <button className="logout-button" onClick={handleLogout}><span>↪</span> Sign out</button>
+            {logoutMutation.isError && <p className="form-error">Could not sign out. Please try again.</p>}
+            <button className="logout-button" onClick={handleLogout} disabled={logoutMutation.isPending}><span>↪</span> {logoutMutation.isPending ? 'Signing out...' : 'Sign out'}</button>
           </div>
         </aside>
 
         <main className="main-content">
           <header className="topbar">
-            <div><p className="breadcrumb">WORKSPACE / CATALOG</p><h1>Good afternoon, admin.</h1></div>
+            <div><p className="breadcrumb">WORKSPACE / CATALOG</p><h1>Good afternoon, {user.name}.</h1></div>
             <div className="topbar-actions"><span className="live-indicator"><i /> Live store</span><div className="avatar">A</div></div>
           </header>
 

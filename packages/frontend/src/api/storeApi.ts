@@ -1,8 +1,17 @@
 import { api, authApi } from './client';
-import type { CartItem, CartResponse, LoginResponse, Order, Product } from '../types/store';
+import type { AuthUser, CartItem, CartResponse, LoginResponse, Order, Product } from '../types/store';
 
 export const login = async (credentials: { email: string; password: string }): Promise<LoginResponse> => {
   const { data } = await authApi.post<LoginResponse>('/api/v1/auth/login', credentials);
+  return data;
+};
+
+export const logout = async (): Promise<void> => {
+  await authApi.post('/api/v1/auth/logout');
+};
+
+export const getProfile = async (): Promise<AuthUser> => {
+  const { data } = await api.get<AuthUser>('/api/v1/auth/profile');
   return data;
 };
 

@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
 import authRoutes from './routes/authRoutes';
 import { runMigrations } from './models/userModel';
@@ -17,7 +16,6 @@ declare global {
   }
 }
 
-app.use(cors());
 app.use(express.json());
 app.use(correlationId);
 

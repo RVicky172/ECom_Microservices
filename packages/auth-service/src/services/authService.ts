@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'node:crypto';
 import { db } from '../models/userModel';
-import { signToken, ValidationError, NotFoundError, ConflictError } from '@ecommerce/shared';
+import { signToken, ValidationError, NotFoundError, ConflictError, UnauthorizedError } from '@ecommerce/shared';
 
 interface RegisterInput {
   email: string;
@@ -23,10 +24,30 @@ interface UserResponse {
 
 interface AuthResponse {
   user: UserResponse;
-  token: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 const SALT_ROUNDS = 10;
+const ACCESS_TOKEN_TTL_SECONDS = Number(process.env.ACCESS_TOKEN_TTL_SECONDS || 900);
+const REFRESH_TOKEN_TTL_SECONDS = Number(process.env.REFRESH_TOKEN_TTL_SECONDS || 604800);
+const hashRefreshToken = (token: string): string => createHash('sha256').update(token).digest('hex');
+
+const createSession = async (user: UserResponse): Promise<AuthResponse> => {
+  const accessToken = signToken(
+    { id: user.id, email: user.email, role: user.role },
+    ACCESS_TOKEN_TTL_SECONDS,
+  );
+  const refreshToken = randomBytes(32).toString('base64url');
+
+  await db('refresh_sessions').insert({
+    user_id: user.id,
+    token_hash: hashRefreshToken(refreshToken),
+    expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
+  });
+
+  return { user, accessToken, refreshToken };
+};
 
 export const register = async ({
   email,
@@ -45,9 +66,7 @@ export const register = async ({
     .insert({ email, password_hash, name })
     .returning(['id', 'email', 'name', 'role', 'created_at']);
 
-  const token = signToken({ id: user.id, email: user.email, role: user.role });
-
-  return { user, token };
+  return createSession(user);
 };
 
 export const login = async ({ email, password }: LoginInput): Promise<AuthResponse> => {
@@ -61,17 +80,68 @@ export const login = async ({ email, password }: LoginInput): Promise<AuthRespon
     throw new ValidationError('Invalid email or password');
   }
 
-  const token = signToken({ id: user.id, email: user.email, role: user.role });
+  return createSession({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  });
+};
 
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    },
-    token,
-  };
+export const rotateRefreshToken = async (refreshToken: string): Promise<AuthResponse> => {
+  const tokenHash = hashRefreshToken(refreshToken);
+
+  return db.transaction(async (transaction) => {
+    const session = await transaction('refresh_sessions')
+      .join('users', 'refresh_sessions.user_id', 'users.id')
+      .select(
+        'refresh_sessions.id as session_id',
+        'refresh_sessions.user_id',
+        'refresh_sessions.expires_at',
+        'users.id',
+        'users.email',
+        'users.name',
+        'users.role',
+      )
+      .where('refresh_sessions.token_hash', tokenHash)
+      .forUpdate('refresh_sessions');
+
+    const currentSession = session[0];
+    if (!currentSession || new Date(currentSession.expires_at).getTime() <= Date.now()) {
+      if (currentSession) {
+        await transaction('refresh_sessions').where({ id: currentSession.session_id }).delete();
+      }
+      throw new UnauthorizedError('Invalid or expired refresh token');
+    }
+
+    await transaction('refresh_sessions').where({ id: currentSession.session_id }).delete();
+
+    const user: UserResponse = {
+      id: currentSession.id,
+      email: currentSession.email,
+      name: currentSession.name,
+      role: currentSession.role,
+    };
+    const accessToken = signToken(
+      { id: user.id, email: user.email, role: user.role },
+      ACCESS_TOKEN_TTL_SECONDS,
+    );
+    const nextRefreshToken = randomBytes(32).toString('base64url');
+
+    await transaction('refresh_sessions').insert({
+      user_id: user.id,
+      token_hash: hashRefreshToken(nextRefreshToken),
+      expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
+    });
+
+    return { user, accessToken, refreshToken: nextRefreshToken };
+  });
+};
+
+export const revokeRefreshToken = async (refreshToken: string | undefined): Promise<void> => {
+  if (refreshToken) {
+    await db('refresh_sessions').where({ token_hash: hashRefreshToken(refreshToken) }).delete();
+  }
 };
 
 export const getProfile = async (userId: string): Promise<UserResponse> => {

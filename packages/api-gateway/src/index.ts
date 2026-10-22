@@ -3,13 +3,19 @@ import cors from 'cors';
 import { createLogger, errorHandler, correlationId } from '@ecommerce/shared';
 import { setupProxies } from './proxy';
 import { rateLimiter } from './middleware/rateLimiter';
+import { csrfProtection } from './middleware/csrfProtection';
 
 const app = express();
 const logger = createLogger('api-gateway');
 const PORT = process.env.PORT || 4000;
+const frontendOrigins = (process.env.FRONTEND_ORIGINS || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors());
+app.use(cors({ origin: frontendOrigins, credentials: true }));
 app.use(correlationId);
+app.use(csrfProtection);
 
 // Global rate limiting
 app.use(rateLimiter(logger));

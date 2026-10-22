@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
 import cartRoutes from './routes/cartRoutes';
 
@@ -16,7 +15,6 @@ declare global {
   }
 }
 
-app.use(cors());
 app.use(express.json());
 app.use(correlationId);
 

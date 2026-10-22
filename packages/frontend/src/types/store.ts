@@ -29,10 +29,14 @@ export interface Order {
   items?: Array<CartItem & { product_name?: string }>;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
 export interface LoginResponse {
-  token: string;
-  user: {
-    name: string;
-    role: string;
-  };
+  accessToken: string;
+  user: AuthUser;
 }

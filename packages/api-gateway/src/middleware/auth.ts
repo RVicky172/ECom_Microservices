@@ -9,11 +9,12 @@ declare module 'express' {
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+
+  if (!token) {
     return next(new UnauthorizedError('Missing or invalid authorization token'));
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const payload = verifyToken(token);
     req.user = payload;

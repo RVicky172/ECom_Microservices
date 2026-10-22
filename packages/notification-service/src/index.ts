@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { createLogger, correlationId } from '@ecommerce/shared';
 import { startConsumer } from './events/consumer';
 
@@ -16,7 +15,6 @@ declare global {
   }
 }
 
-app.use(cors());
 app.use(express.json());
 app.use(correlationId);
 
