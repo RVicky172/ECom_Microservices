@@ -49,8 +49,8 @@
         {
           "id": "011",
           "name": "Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3)",
-          "status": "not-started",
-          "folder": null
+          "status": "in-progress",
+          "folder": "011-assistant-policies-handoff"
         },
         {
           "id": "012",

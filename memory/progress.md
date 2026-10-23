@@ -11,6 +11,24 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-23 — 011: assistant policies + handoff, implement (T001–T033 done, 16 of 21 tasks)
+
+**Done:**
+- T001 spike: Claude is tested with a stubbed `@anthropic-ai/sdk` (D-018); the assistant service's first tests.
+- Policy document `packages/assistant-service/policies/store-policies.md` (D-016 terms) in the cached system prompt;
+  a missing or empty file stops startup (checked live).
+- Shared `assistant.handoff_requested` event + parser; assistant `request_human_handoff` tool (Redis reference per
+  conversation, lazy Kafka producer, 5 s cap, D-019 edge cases); notification logs a support email once per event;
+  widget label "Contacting support…". Every new test seen failing; break checks recorded. 228 tests.
+- T032 live on Qwen3 30B: attempt 1 invented "we don't offer X" for all uncovered questions; prompt tuning fixed that
+  but broke P7; attempt 4 with an explicit document (D-020, new term: refund period starts when the return is
+  received) → 10/10 covered, 3/3 uncovered, 0 handoffs in 60 runs. T033: 30 → 45 days changes the answer (Docker
+  needs a rebuild, not a restart).
+
+**Next:** T034 live handoff runs (request, repeat, replay, Kafka stopped; user A's hourly budget was nearly used,
+use the admin user or wait), then T090 docs, T091 gates, T092 close-out.
+**Blockers:** none
+
 ## 2026-10-23 — 010: saga payloads verified ✔️
 
 **Done:** T034 with RVicky172 in the storefront:

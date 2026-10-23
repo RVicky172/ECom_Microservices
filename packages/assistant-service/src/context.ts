@@ -8,4 +8,6 @@
 export interface RequestContext {
   userId: string;
   correlationId: string;
+  /** The chat this turn belongs to; a handoff is recorded per conversation. */
+  conversationId: string;
 }

@@ -32,7 +32,7 @@ _Goal:_ checkout completes end to end through the saga, and the AI assistant rea
 | #   | Feature | Spec | Status |
 | --- | ------- | ---- | ------ |
 | 010 | Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED` | [spec](features/010-saga-payloads/spec.md) | ✔️ |
-| 011 | Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3) | — | ⬜ |
+| 011 | Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3) | [spec](features/011-assistant-policies-handoff/spec.md) | 🚧 |
 | 012 | Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4) | — | ⬜ |
 
 **Exit criteria:** an order placed in the UI reaches `CONFIRMED` (or `CANCELLED` with a reason) without manual

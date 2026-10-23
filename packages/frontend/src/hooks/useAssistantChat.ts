@@ -20,6 +20,7 @@ const TOOL_ACTIVITY: Record<string, string> = {
   list_orders: 'Checking your orders…',
   get_order: 'Checking your order…',
   propose_add_to_cart: 'Preparing your cart suggestion…',
+  request_human_handoff: 'Contacting support…',
 };
 
 const storageKey = (userId: string) => `mercato:assistant:${userId}`;
