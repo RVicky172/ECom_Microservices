@@ -1,0 +1,220 @@
+{
+  "id": "004",
+  "folder": "004-spec-dashboard",
+  "title": "Spec Dashboard",
+  "phase": 0,
+  "status": "in-progress",
+  "stage": "implementing",
+  "created": "2026-10-23",
+  "updated": "2026-10-23",
+  "summary": "A local web dashboard, running as its own process, that shows the roadmap, each feature's stage and progress, and the project memory, read from JSON tracking files kept in sync with the Markdown specs.",
+  "acceptanceCriteria": [
+    {
+      "id": "AC-1",
+      "text": "Starts with one command on its own port; the store is not needed.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-2",
+      "text": "Overview shows phases (goal, exit criteria), features with status badges, counts per status and the backlog from specs/roadmap.json.",
+      "test": "unit + manual",
+      "done": true
+    },
+    {
+      "id": "AC-3",
+      "text": "Each feature with a feature.json shows its stage and AC/task progress bars from the JSON.",
+      "test": "unit + manual",
+      "done": true
+    },
+    {
+      "id": "AC-4",
+      "text": "Feature page shows summary, ACs and tasks with done state, unresolved questions and the rendered spec/plan/tasks.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-5",
+      "text": "Memory view shows Current State, the 5 newest progress entries, all decisions and learnings.",
+      "test": "unit + manual",
+      "done": true
+    },
+    {
+      "id": "AC-6",
+      "text": "Saving a file under specs/ or memory/ updates the open page within 3 seconds.",
+      "test": "manual measurement",
+      "done": false
+    },
+    {
+      "id": "AC-7",
+      "text": "Missing or invalid tracking files show a message naming the file and problem; the rest still renders.",
+      "test": "unit",
+      "done": true
+    },
+    {
+      "id": "AC-8",
+      "text": "The dashboard never writes to the repository.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-9",
+      "text": "Root npm run check fails when tracking JSON breaks its schema or disagrees with the Markdown, and passes when they agree.",
+      "test": "unit (sabotage)",
+      "done": true
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Scaffold tools/spec-dashboard, root dashboard script, .gitignore",
+      "done": true,
+      "result": "Next 16.4.2, React 19.3.1, TS 5.9.3, Vitest 5.0.5"
+    },
+    {
+      "id": "T010",
+      "title": "Failing tests for the roadmap Markdown parser",
+      "done": true
+    },
+    {
+      "id": "T011",
+      "title": "Failing tests for the feature Markdown parser",
+      "done": true
+    },
+    {
+      "id": "T012",
+      "title": "Failing tests for the memory parser",
+      "done": true,
+      "result": "fixture strengthened after a missed sabotage"
+    },
+    {
+      "id": "T013",
+      "title": "Failing tests for the JSON schemas",
+      "done": true
+    },
+    {
+      "id": "T014",
+      "title": "Failing tests for the JSON ↔ Markdown consistency check",
+      "done": true
+    },
+    {
+      "id": "T015",
+      "title": "Real-repository consistency test",
+      "done": true
+    },
+    {
+      "id": "T020",
+      "title": "Roadmap Markdown parser",
+      "done": true
+    },
+    {
+      "id": "T021",
+      "title": "Feature Markdown parser",
+      "done": true
+    },
+    {
+      "id": "T022",
+      "title": "Memory parser",
+      "done": true
+    },
+    {
+      "id": "T023",
+      "title": "Repo access with JSON loading",
+      "done": true
+    },
+    {
+      "id": "T024",
+      "title": "JSON schemas and tolerant loader",
+      "done": true
+    },
+    {
+      "id": "T025",
+      "title": "Consistency check",
+      "done": true
+    },
+    {
+      "id": "T026",
+      "title": "Tracking files: roadmap.json, feature.json, feature template",
+      "done": true,
+      "result": "tracking files in place; real-repo check passes"
+    },
+    {
+      "id": "T030",
+      "title": "Overview page from JSON",
+      "done": true,
+      "result": "renders from JSON"
+    },
+    {
+      "id": "T031",
+      "title": "Feature page from JSON plus rendered documents",
+      "done": true,
+      "result": "404 / 400 for bad folders"
+    },
+    {
+      "id": "T032",
+      "title": "Memory page",
+      "done": true,
+      "result": "5 progress, 5 decisions, 3 topics"
+    },
+    {
+      "id": "T033",
+      "title": "Live updates: watcher, SSE route, LiveRefresh",
+      "done": true,
+      "result": "SSE event ~310 ms after a save"
+    },
+    {
+      "id": "T034",
+      "title": "Root npm run check runs the dashboard checks",
+      "done": true,
+      "result": "sabotage caught by root check"
+    },
+    {
+      "id": "T035",
+      "title": "Workflow keeps JSON current: commands, workflow.md, CLAUDE.md, templates",
+      "done": true,
+      "result": "commands and docs updated"
+    },
+    {
+      "id": "T040",
+      "title": "Manual checks and next build",
+      "done": false
+    },
+    {
+      "id": "T090",
+      "title": "Architecture, tech stack, READMEs",
+      "done": true,
+      "result": "docs updated"
+    },
+    {
+      "id": "T091",
+      "title": "Definition-of-Done gates green",
+      "done": true,
+      "result": "check 12/12, build exit 0, next build clean"
+    },
+    {
+      "id": "T092",
+      "title": "Tick ACs, update roadmap and memory",
+      "done": false
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "Q1",
+      "text": "Where does it live and how is it started?",
+      "resolved": true,
+      "answer": "tools/spec-dashboard, standalone Next.js app, npm run dashboard, port 3100"
+    },
+    {
+      "id": "Q2",
+      "text": "How live should updates be?",
+      "resolved": true,
+      "answer": "File watching pushes a change signal to open pages (≤ 3 s)"
+    },
+    {
+      "id": "Q3",
+      "text": "Should it show the gate status?",
+      "resolved": true,
+      "answer": "Not for now"
+    }
+  ]
+}

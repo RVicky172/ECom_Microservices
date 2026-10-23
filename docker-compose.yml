@@ -128,6 +128,7 @@ services:
     env_file: .env
     environment:
       PORT: 4000
+      ASSISTANT_SERVICE_URL: ${ASSISTANT_SERVICE_URL:-http://assistant-service:4008}
     depends_on:
       auth-service:
         condition: service_healthy
@@ -275,6 +276,31 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    networks:
+      - ecommerce-net
+
+  # Optional: the store works without it. Needs ANTHROPIC_API_KEY in .env to answer chats.
+  assistant-service:
+    build:
+      context: .
+      dockerfile: packages/assistant-service/Dockerfile
+    ports:
+      - "4008:4008"
+    env_file: .env
+    environment:
+      PORT: 4008
+    # Lets the container reach a model server on your machine (LM Studio) as host.docker.internal.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4008/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     networks:
       - ecommerce-net
 

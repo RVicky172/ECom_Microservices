@@ -74,7 +74,8 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
   try {
     const refreshToken = readCookie(req, REFRESH_COOKIE_NAME);
     if (!refreshToken) {
-      throw new UnauthorizedError('Missing refresh token');
+      res.json({ accessToken: null });
+      return;
     }
 
     const result = await authService.rotateRefreshToken(refreshToken);
@@ -84,6 +85,8 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
     if (err instanceof UnauthorizedError) {
       res.clearCookie('access_token', { ...baseCookieOptions, path: '/' });
       res.clearCookie(REFRESH_COOKIE_NAME, { ...baseCookieOptions, path: '/api/v1/auth' });
+      res.json({ accessToken: null });
+      return;
     }
     next(err);
   }

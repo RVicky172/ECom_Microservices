@@ -1,27 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Provider } from 'react-redux';
 import App from './App';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      refetchOnMount: false,
-      retry: 1,
-    },
-  },
-});
+import { store } from './app/store';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('root element not found');
 
+/** Entry point: mounts the app inside the Redux store provider. */
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <Provider store={store}>
       <App />
-    </QueryClientProvider>
+    </Provider>
   </React.StrictMode>
 );

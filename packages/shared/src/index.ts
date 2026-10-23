@@ -5,3 +5,4 @@ export * from './errors';
 export * from './jwt';
 export * from './middleware/errorHandler';
 export * from './middleware/correlationId';
+export * from './middleware/internalAuth';

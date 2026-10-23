@@ -1,6 +1,7 @@
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Express, Request, Response } from 'express';
 import { Logger } from 'pino';
+import { INTERNAL_TOKEN_HEADER } from '@ecommerce/shared';
 import { requireAuth } from './middleware/auth';
 
 const SERVICES = {
@@ -10,14 +11,23 @@ const SERVICES = {
   order: process.env.ORDER_SERVICE_URL || 'http://localhost:4004',
   inventory: process.env.INVENTORY_SERVICE_URL || 'http://localhost:4005',
   payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:4006',
+  assistant: process.env.ASSISTANT_SERVICE_URL || 'http://localhost:4008',
 };
+
+/** Assistant replies stream for a while (longer with local models); default five minutes. */
+const ASSISTANT_TIMEOUT_MS = parseInt(process.env.ASSISTANT_TIMEOUT_MS || '300000', 10);
 
 export const setupProxies = (app: Express, logger: Logger) => {
   // Utility to create a proxy with error handling and correlation ID forwarding
-  const createProxy = (target: string, routePrefix: string): ReturnType<typeof createProxyMiddleware> => {
+  const createProxy = (
+    target: string,
+    routePrefix: string,
+    timeoutMs?: number,
+  ): ReturnType<typeof createProxyMiddleware> => {
     return createProxyMiddleware({
       target,
       changeOrigin: true,
+      ...(timeoutMs ? { proxyTimeout: timeoutMs, timeout: timeoutMs } : {}),
       pathRewrite: (path) => `${routePrefix}${path}`,
       on: {
         proxyReq: (proxyReq, req) => {
@@ -27,6 +37,18 @@ export const setupProxies = (app: Express, logger: Logger) => {
           if (expressRequest.headers['x-correlation-id']) {
             proxyReq.setHeader('x-correlation-id', expressRequest.headers['x-correlation-id']);
           }
+
+          // Prove to the service that this request came through the gateway
+          // and never pass through a client-supplied value.
+          proxyReq.removeHeader(INTERNAL_TOKEN_HEADER);
+          if (process.env.INTERNAL_SERVICE_TOKEN) {
+            proxyReq.setHeader(INTERNAL_TOKEN_HEADER, process.env.INTERNAL_SERVICE_TOKEN);
+          }
+
+          // Identity headers are set only from the verified JWT, never passed through from the client.
+          proxyReq.removeHeader('x-user-id');
+          proxyReq.removeHeader('x-user-role');
+          proxyReq.removeHeader('x-user-email');
 
           // Forward user info if authenticated
           const user = expressRequest.user;
@@ -59,4 +81,7 @@ export const setupProxies = (app: Express, logger: Logger) => {
   
   // Payment service routes (requires authentication)
   app.use('/api/v1/payments', requireAuth, createProxy(SERVICES.payment, '/api/v1/payments'));
+
+  // AI shopping assistant (requires authentication; streams Server-Sent Events)
+  app.use('/api/v1/assistant', requireAuth, createProxy(SERVICES.assistant, '/api/v1/assistant', ASSISTANT_TIMEOUT_MS));
 };

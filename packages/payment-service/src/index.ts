@@ -1,5 +1,5 @@
 import express from 'express';
-import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
+import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import paymentRoutes from './routes/paymentRoutes';
 import { runMigrations } from './models/paymentModel';
 import { startConsumer } from './events/consumer';
@@ -19,6 +19,7 @@ declare global {
 
 app.use(express.json());
 app.use(correlationId);
+app.use(requireInternalToken);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });

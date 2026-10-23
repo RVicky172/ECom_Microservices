@@ -1,6 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
+import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import productRoutes from './routes/productRoutes';
 
 const logger = createLogger('product-service');
@@ -18,6 +18,7 @@ declare global {
 
 app.use(express.json());
 app.use(correlationId);
+app.use(requireInternalToken);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });

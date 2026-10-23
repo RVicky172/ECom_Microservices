@@ -1,0 +1,77 @@
+{
+  "project": "mercato — E-Commerce Microservices Platform",
+  "updated": "2026-10-23",
+  "phases": [
+    {
+      "number": 0,
+      "title": "Foundation",
+      "goal": "What exists is recorded, the repo has a real test harness and CI, and known security gaps are closed.",
+      "exitCriteria": "On a clean clone, `npm ci && npm run check && npm test && npm run build` pass, the same runs green in CI, and a user cannot read another user's order or payment.",
+      "features": [
+        {
+          "id": "000",
+          "name": "Baseline: record current services, routes, events and known gaps as the starting point",
+          "status": "not-started",
+          "folder": null
+        },
+        {
+          "id": "001",
+          "name": "Test harness: Vitest across packages, wired into `npm test` and `npm run check`, first unit tests",
+          "status": "not-started",
+          "folder": null
+        },
+        {
+          "id": "002",
+          "name": "Ownership checks on `GET /orders/:id` and `GET /payments/:orderId` (users see only their own data)",
+          "status": "not-started",
+          "folder": null
+        },
+        {
+          "id": "003",
+          "name": "CI: GitHub Actions running check, test and build on every push and pull request",
+          "status": "not-started",
+          "folder": null
+        },
+        {
+          "id": "004",
+          "name": "Spec dashboard: local Next.js app showing roadmap, feature progress and memory, live",
+          "status": "in-progress",
+          "folder": "004-spec-dashboard"
+        }
+      ]
+    },
+    {
+      "number": 1,
+      "title": "Checkout & Assistant",
+      "goal": "Checkout completes end to end through the saga, and the AI assistant reaches its planned feature set.",
+      "exitCriteria": "An order placed in the UI reaches `CONFIRMED` (or `CANCELLED` with a reason) without manual steps, and the assistant eval suite passes its agreed target on the configured model.",
+      "features": [
+        {
+          "id": "010",
+          "name": "Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED`",
+          "status": "not-started",
+          "folder": null
+        },
+        {
+          "id": "011",
+          "name": "Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3)",
+          "status": "not-started",
+          "folder": null
+        },
+        {
+          "id": "012",
+          "name": "Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4)",
+          "status": "not-started",
+          "folder": null
+        }
+      ]
+    }
+  ],
+  "backlog": [
+    "Protect product write routes (admin role check at the gateway or in product-service).",
+    "Shared rate limiting (the gateway limiter is per process, in memory).",
+    "Assistant: `assistant.interaction` analytics events; compaction for long conversations.",
+    "Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.",
+    "Server-side price lookup when adding to cart (the cart currently trusts the client's price)."
+  ]
+}

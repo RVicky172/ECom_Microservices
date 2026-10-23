@@ -1,5 +1,5 @@
 import express from 'express';
-import { createLogger, correlationId, errorHandler } from '@ecommerce/shared';
+import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import authRoutes from './routes/authRoutes';
 import { runMigrations } from './models/userModel';
 
@@ -18,6 +18,7 @@ declare global {
 
 app.use(express.json());
 app.use(correlationId);
+app.use(requireInternalToken);
 
 app.use((req, res, next) => {
   req.log = logger.child({ correlationId: req.correlationId });

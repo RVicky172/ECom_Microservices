@@ -1,0 +1,18 @@
+{
+  "id": "NNN",
+  "folder": "NNN-kebab-name",
+  "title": "Feature Name",
+  "phase": 0,
+  "status": "draft",
+  "stage": "spec",
+  "created": "YYYY-MM-DD",
+  "updated": "YYYY-MM-DD",
+  "summary": "One or two sentences: what this feature is and why it matters.",
+  "acceptanceCriteria": [
+    { "id": "AC-1", "text": "Short form of AC-1 from spec.md.", "test": "unit", "done": false }
+  ],
+  "tasks": [],
+  "openQuestions": [
+    { "id": "Q1", "text": "Short form of Q1 from spec.md.", "resolved": false }
+  ]
+}

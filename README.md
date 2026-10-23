@@ -21,6 +21,7 @@ flowchart LR
       inventory["Inventory<br/>:4005"]
       payment["Payment<br/>:4006"]
       notification["Notification<br/>:4007"]
+      assistant["Assistant<br/>:4008"]
    end
 
    gateway --> auth
@@ -29,6 +30,11 @@ flowchart LR
    gateway --> order
    gateway --> inventory
    gateway --> payment
+   gateway --> assistant
+   assistant -. "read-only tools" .-> product
+   assistant -. "read-only tools" .-> order
+   assistant --> redis
+   assistant <--> claude(("Claude API"))
 
    subgraph data[Service-owned data]
       authdb[(Auth DB<br/>PostgreSQL)]
@@ -59,35 +65,45 @@ flowchart LR
    classDef data fill:#f4f1eb,color:#1e2421,stroke:#dedbd3
    classDef event fill:#e9c46a,color:#1e2421,stroke:#b08b2e,stroke-width:2px
    class gateway edge
-   class auth,product,cart,order,inventory,payment,notification service
+   class auth,product,cart,order,inventory,payment,notification,assistant service
    class authdb,productdb,orderdb,inventorydb,paymentdb,redis data
    class kafka event
 ```
 
-**Checkout event flow:** `order.created` -> `inventory.reserved` ->
+**Intended checkout event flow:** `order.created` -> `inventory.reserved` ->
 `payment.completed` -> order confirmation. Rejection or payment failure emits a
 compensating event that releases inventory and cancels the order. Solid arrows
 represent synchronous HTTP/data access; dotted arrows represent Kafka events.
+The current `inventory.reserved` event omits the amount and items expected by
+the payment consumer, so the event payloads need to be aligned for checkout to
+complete end to end.
 
 Each service owns its data and communicates through the gateway for HTTP requests
 and Kafka for asynchronous checkout events. Redis is shared by the cart service
 and the product cache; PostgreSQL databases remain logically separated per service.
 
+The **Assistant Service** answers customer questions with Claude, or with a local model in LM Studio (`ASSISTANT_PROVIDER`). It looks up
+products, stock, the cart and orders through read-only calls to the other
+services, and can only *suggest* cart changes that the customer confirms. See
+the [AI shopping assistant design and plan](docs/ai-shopping-assistant.md).
+
 ---
 
 ## 📦 Services
 
-| Service | Port | Database | Description |
-|---------|------|----------|-------------|
-| **API Gateway** | 4000 | — | Reverse proxy, JWT validation, rate limiting, correlation IDs |
-| **Auth Service** | 4001 | PostgreSQL | User registration, login, JWT issuance |
-| **Product Service** | 4002 | MongoDB + Redis | Product catalog CRUD with cache-aside pattern |
-| **Cart Service** | 4003 | Redis | Session-based shopping cart |
-| **Order Service** | 4004 | PostgreSQL | Order lifecycle, state machine, outbox pattern |
-| **Inventory Service** | 4005 | PostgreSQL | Stock management, atomic reservation |
-| **Payment Service** | 4006 | PostgreSQL | Payment processing (simulated), idempotency keys |
-| **Notification Service** | 4007 | — | Event consumer — logs email/SMS notifications |
-| **Frontend** | 3000 | — | React + Vite SPA |
+| Service | Port | Database | Description | Learning guide |
+|---------|------|----------|-------------|---------------|
+| **API Gateway** | 4000 | — | Reverse proxy, JWT validation, rate limiting, correlation IDs | [Guide](packages/api-gateway/README.md) |
+| **Auth Service** | 4001 | PostgreSQL | User registration, login, JWT issuance | [Guide](packages/auth-service/README.md) |
+| **Product Service** | 4002 | MongoDB + Redis | Product catalog CRUD with cache-aside pattern | [Guide](packages/product-service/README.md) |
+| **Cart Service** | 4003 | Redis | Session-based shopping cart | [Guide](packages/cart-service/README.md) |
+| **Order Service** | 4004 | PostgreSQL | Order lifecycle, state machine, outbox pattern | [Guide](packages/order-service/README.md) |
+| **Inventory Service** | 4005 | PostgreSQL | Stock management, atomic reservation | [Guide](packages/inventory-service/README.md) |
+| **Payment Service** | 4006 | PostgreSQL | Payment processing (simulated), idempotency keys | [Guide](packages/payment-service/README.md) |
+| **Notification Service** | 4007 | — | Event consumer — logs simulated email notifications | [Guide](packages/notification-service/README.md) |
+| **Assistant Service** | 4008 | Redis | AI shopping assistant (Claude tool use): product discovery, stock, order status, cart suggestions | [Guide](packages/assistant-service/README.md) |
+| **Frontend** | 3000 | — | React + Vite SPA | [Guide](packages/frontend/README.md) |
+| **Shared package** | — | — | Common events, errors, Kafka, JWT, logging, and middleware | [Guide](packages/shared/README.md) |
 
 ---
 
@@ -112,6 +128,9 @@ and the product cache; PostgreSQL databases remain logically separated per servi
 | http-proxy-middleware | 3.x | API Gateway reverse proxy |
 | express-rate-limit | 7.x | Rate limiting |
 | uuid | 9.x | Correlation IDs, idempotency keys |
+| @anthropic-ai/sdk | 1.x | Claude API client and tool runner (assistant service) |
+| openai | 7.x | OpenAI-compatible client for local models such as LM Studio (assistant service) |
+| Zod | 4.x | Assistant tool input schemas and request validation |
 
 ### Frontend
 | Technology | Version | Purpose |
@@ -120,6 +139,7 @@ and the product cache; PostgreSQL databases remain logically separated per servi
 | Vite | 5.4.1 | Build tool / dev server |
 | TypeScript | 5.3.3 | Frontend type checking and build |
 | React Router | 6.x | Client-side routing |
+| Redux Toolkit + RTK Query | 2.x | Client session state and cached API data |
 | Axios | 1.x | API calls |
 
 ### Infrastructure
@@ -553,6 +573,18 @@ PUT    /api/v1/inventory/:productId  — Update stock (admin)
 GET    /api/v1/payments/:orderId     — Get payment status
 ```
 
+### Assistant
+```
+POST   /api/v1/assistant/chat               — Send a message; reply streams as Server-Sent Events
+GET    /api/v1/assistant/conversations/:id  — Visible transcript of a conversation
+DELETE /api/v1/assistant/conversations/:id  — Delete a conversation
+```
+
+All assistant routes require a Bearer access token. The assistant is optional: set
+`ANTHROPIC_API_KEY` in `.env` to enable it, or use a local model with
+`ASSISTANT_PROVIDER=openai-compatible` (see the [assistant guide](packages/assistant-service/README.md#using-lm-studio)); without it the chat explains that it
+is not set up and the store works as usual.
+
 ---
 
 ## 🔄 Event Flow — Checkout Saga
@@ -625,6 +657,9 @@ npm test -- --coverage
 | **State Machine** | `order-service/` | §3.3 |
 | **Rate Limiting** | `api-gateway/` | §10.1, E.4 |
 | **Database per Service** | All services | §6, §9 |
+| **LLM tool use (agent loop)** | `assistant-service/` | [Plan](docs/ai-shopping-assistant.md) |
+| **Human-in-the-loop writes** | Assistant proposals → cart | [Plan](docs/ai-shopping-assistant.md) |
+| **Internal service token** | `shared/middleware/internalAuth.ts` | [Plan](docs/ai-shopping-assistant.md) §2 |
 
 ---
 
@@ -642,7 +677,12 @@ Microservices/
 │   ├── inventory-service/   # Stock + atomic reservation
 │   ├── payment-service/     # Payments + idempotency
 │   ├── notification-service/# Event consumer (email/SMS logs)
+│   ├── assistant-service/   # AI shopping assistant (Claude tool use)
 │   └── frontend/            # React SPA
+├── docs/                    # Design documents (AI shopping assistant)
+├── specs/                   # Spec-driven workflow: constitution, roadmap, feature specs (see CLAUDE.md)
+├── tools/spec-dashboard/    # Local dashboard for specs and memory: `npm run dashboard` → http://127.0.0.1:3100
+├── memory/                  # Project memory: current state, decisions, progress, learnings
 ├── scripts/                 # Database initialization and sample-data seed
 ├── docker-compose.yml       # Full stack
 ├── docker-compose.infra.yml # Infrastructure only

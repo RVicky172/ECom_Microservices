@@ -28,6 +28,8 @@ logs/
 .cache/
 .eslintcache
 .vite/
+.next/
+next-env.d.ts
 
 # IDE and OS files
 .vscode/*

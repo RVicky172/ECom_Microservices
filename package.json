@@ -15,7 +15,11 @@
     "dev:inventory": "npm run dev --workspace=packages/inventory-service",
     "dev:payment": "npm run dev --workspace=packages/payment-service",
     "dev:notification": "npm run dev --workspace=packages/notification-service",
+    "dev:assistant": "npm run dev --workspace=packages/assistant-service",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "check": "node scripts/check.mjs",
+    "dashboard": "node tools/spec-dashboard/scripts/start.mjs",
+    "build": "npm run build --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "seed": "node scripts/seed-data.js"
   },
