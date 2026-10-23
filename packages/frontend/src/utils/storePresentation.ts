@@ -26,6 +26,13 @@ export const getStatusClass = (status: string): string => {
   return 'status status-pending';
 };
 
+/** Shopper-facing text for why an order was cancelled (order-service `cancel_reason`). */
+export const cancelReasonLabel = (reason: string | null | undefined): string => {
+  if (reason === 'OUT_OF_STOCK') return 'Out of stock';
+  if (reason === 'PAYMENT_DECLINED') return 'Payment declined';
+  return 'Cancelled';
+};
+
 /** Time-of-day greeting for the header, e.g. "Good morning". */
 export const getGreeting = (date: Date = new Date()): string => {
   const hour = date.getHours();

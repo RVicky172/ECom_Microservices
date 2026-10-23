@@ -1,91 +1,30 @@
-import { createKafkaClient, createConsumer, createProducer, KafkaTopics, EventTypes } from '@ecommerce/shared';
-import { processPayment } from '../services/paymentService';
-import { v4 as uuidv4 } from 'uuid';
+import { createKafkaClient, createProducer, KafkaTopics, startSagaConsumer } from '@ecommerce/shared';
+import type { SagaConsumerHandle } from '@ecommerce/shared';
+import type { Producer } from 'kafkajs';
+import { handleInventoryReserved } from './sagaHandlers';
 
-let producer: any = null;
+type Logger = { info: Function; warn: Function; error: Function };
 
-export const startConsumer = async (logger: any): Promise<void> => {
-  try {
-    const kafka = createKafkaClient('payment-service-consumer');
-    const consumer = await createConsumer(kafka, 'payment-service-group');
+/**
+ * Starts the payment service's saga consumer (inventory.reserved). The consumer
+ * retries until Kafka is ready (D-015); the producer for payment outcomes connects
+ * on first use.
+ */
+export const startConsumer = (logger: Logger): SagaConsumerHandle => {
+  let producer: Promise<Producer> | undefined;
+  const getProducer = () => (producer ??= createProducer(createKafkaClient('payment-service-producer')).catch((err) => {
+    producer = undefined; // try again on the next event
+    throw err;
+  }));
 
-    const producerKafka = createKafkaClient('payment-service-producer');
-    producer = await createProducer(producerKafka);
-
-    await consumer.subscribe({ topics: [KafkaTopics.INVENTORY_RESERVED], fromBeginning: false });
-
-    await consumer.run({
-      eachMessage: async ({ topic, message }) => {
-        const event = JSON.parse(message.value!.toString());
-        const correlationId = message.headers?.['correlation-id']?.toString() || 'unknown';
-        const { orderId, totalAmount, items } = event.data;
-
-        logger.info({ topic, orderId, correlationId }, `Received event: ${topic}`);
-
-        try {
-          // Use eventId as idempotency key for async flow
-          const idempotencyKey = `evt_${event.eventId}`;
-
-          const result = await processPayment(orderId, totalAmount, idempotencyKey);
-
-          if (result.status === 'COMPLETED') {
-            logger.info({ orderId }, 'Payment successful');
-            await publishEvent(
-              KafkaTopics.PAYMENT_COMPLETED,
-              EventTypes.PAYMENT_COMPLETED,
-              orderId,
-              { orderId, items },
-              correlationId
-            );
-          } else {
-            logger.info({ orderId }, 'Payment failed');
-            await publishEvent(
-              KafkaTopics.PAYMENT_FAILED,
-              EventTypes.PAYMENT_FAILED,
-              orderId,
-              { orderId, items, reason: 'Card declined' },
-              correlationId
-            );
-          }
-        } catch (err) {
-          logger.error(
-            { err: (err as Error).message, orderId },
-            'Error processing payment event'
-          );
-        }
-      },
-    });
-
-    logger.info('Payment Service consumer started');
-  } catch (err) {
-    logger.error({ err: (err as Error).message }, 'Failed to start Payment Service consumer');
-  }
-};
-
-const publishEvent = async (
-  topic: string,
-  eventType: string,
-  aggregateId: string,
-  data: any,
-  correlationId: string
-): Promise<void> => {
-  await producer.send({
-    topic,
-    messages: [
-      {
-        key: aggregateId,
-        value: JSON.stringify({
-          eventId: uuidv4(),
-          eventType,
-          aggregateId,
-          data,
-          timestamp: new Date().toISOString(),
-        }),
-        headers: {
-          'correlation-id': correlationId,
-          'event-type': eventType,
-        },
-      },
-    ],
+  return startSagaConsumer({
+    clientId: 'payment-service-consumer',
+    groupId: 'payment-service-group',
+    topics: [KafkaTopics.INVENTORY_RESERVED],
+    logger,
+    onMessage: async (topic, event, correlationId) => {
+      logger.info({ topic, eventId: event.eventId, correlationId }, `Received event: ${topic}`);
+      await handleInventoryReserved(event, correlationId, logger, await getProducer());
+    },
   });
 };

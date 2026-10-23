@@ -21,6 +21,6 @@ export const sendPaymentSuccessEmail = async (data: NotificationData, logger: an
 export const sendPaymentFailedEmail = async (data: NotificationData, logger: any): Promise<void> => {
   logger.info(
     { orderId: data.orderId, reason: data.reason },
-    `[EMAIL SENT] Payment for order ${data.orderId} failed. Your order has been cancelled.`
+    `[EMAIL SENT] Payment for order ${data.orderId} failed (${data.reason ?? 'unknown reason'}). Your order has been cancelled.`
   );
 };

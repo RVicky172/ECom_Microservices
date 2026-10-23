@@ -35,6 +35,14 @@ export const runMigrations = async (): Promise<void> => {
     console.log('Created orders table');
   }
 
+  // Why an order was cancelled (feature 010); added in place on existing databases
+  if (!(await db.schema.hasColumn('orders', 'cancel_reason'))) {
+    await db.schema.alterTable('orders', (table) => {
+      table.string('cancel_reason').nullable();
+    });
+    console.log('Added orders.cancel_reason');
+  }
+
   // Order items — denormalized product name/price at order time (Section 9.4)
   if (!(await db.schema.hasTable('order_items'))) {
     await db.schema.createTable('order_items', (table) => {

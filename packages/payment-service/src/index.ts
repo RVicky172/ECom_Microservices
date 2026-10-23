@@ -3,10 +3,12 @@ import { createLogger, correlationId, errorHandler, requireInternalToken } from 
 import paymentRoutes from './routes/paymentRoutes';
 import { runMigrations } from './models/paymentModel';
 import { startConsumer } from './events/consumer';
+import type { SagaConsumerHandle } from '@ecommerce/shared';
 
 const logger = createLogger('payment-service');
 const app = express();
 const PORT = process.env.PORT || 4006;
+let consumer: SagaConsumerHandle | undefined;
 
 declare global {
   namespace Express {
@@ -27,7 +29,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'payment-service' });
+  res.json({ status: 'ok', service: 'payment-service', consumer: consumer?.status() ?? 'starting' });
 });
 
 app.use('/api/v1/payments', paymentRoutes);
@@ -38,7 +40,7 @@ const start = async (): Promise<void> => {
   await runMigrations();
   logger.info('Database migrations complete');
 
-  await startConsumer(logger);
+  consumer = startConsumer(logger); // retries until Kafka is ready (D-015)
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, 'Payment Service started');

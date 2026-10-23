@@ -1,5 +1,5 @@
 import { useGetOrdersQuery } from '../api/storeApi';
-import { formatCurrency, getStatusClass } from '../utils/storePresentation';
+import { cancelReasonLabel, formatCurrency, getStatusClass } from '../utils/storePresentation';
 
 /**
  * The signed-in user's orders, newest data from `getOrders`.
@@ -26,7 +26,10 @@ export function OrdersSection(): React.JSX.Element {
               <span className="order-mark">M</span>
               <div>
                 <strong>Order {order.id.split('-')[0].toUpperCase()}</strong>
-                <span>{order.items?.length ?? 0} items</span>
+                <span>
+                  {order.items?.length ?? 0} items
+                  {order.status === 'CANCELLED' && ` · ${cancelReasonLabel(order.cancel_reason)}`}
+                </span>
               </div>
             </div>
             <span className={getStatusClass(order.status)}>{order.status}</span>

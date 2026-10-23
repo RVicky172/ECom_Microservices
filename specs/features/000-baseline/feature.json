@@ -1,0 +1,151 @@
+{
+  "id": "000",
+  "folder": "000-baseline",
+  "title": "Baseline",
+  "phase": 0,
+  "status": "implemented",
+  "stage": "verified",
+  "created": "2026-10-23",
+  "updated": "2026-10-23",
+  "summary": "A written record of the platform as it is today (services, routes, Kafka events, pre-SDD work and known gaps) so later features are checked against a known starting point.",
+  "acceptanceCriteria": [
+    {
+      "id": "AC-1",
+      "text": "Lists all 10 runnable packages plus shared, each with port, owned data store and responsibility.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-2",
+      "text": "Every gateway route listed with method, path, owning service and auth requirement; service-only routes marked internal.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-3",
+      "text": "Each of the 6 Kafka topics listed with producer, consumers and actual payload; producer/consumer mismatches listed as gaps.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-4",
+      "text": "Records pre-SDD work: frontend pages, assistant tools and its 2 providers, internal service token behaviour.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-5",
+      "text": "Known-gaps list includes the 5 known gaps and every gap points to a roadmap feature or backlog item.",
+      "test": "manual",
+      "done": true
+    },
+    {
+      "id": "AC-6",
+      "text": "After a clean docker compose up, every backend /health is healthy and the frontend GET / returns 200; result recorded as a measurement.",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-7",
+      "text": "npm run check and npm run build pass; no file under packages/ changed.",
+      "test": "manual",
+      "done": true
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Create baseline.md skeleton with header and Source lines",
+      "done": true,
+      "result": "7 sections, Source lines"
+    },
+    {
+      "id": "T005",
+      "title": "Record expected counts from the code before writing tables",
+      "done": true,
+      "result": "11 / 24 / 6 / 7 / 6"
+    },
+    {
+      "id": "T010",
+      "title": "Services table",
+      "done": true,
+      "result": "11 rows, no cross-store access"
+    },
+    {
+      "id": "T011",
+      "title": "API routes table",
+      "done": true,
+      "result": "24 rows"
+    },
+    {
+      "id": "T012",
+      "title": "Frontend pages table",
+      "done": true,
+      "result": "6 rows"
+    },
+    {
+      "id": "T013",
+      "title": "Kafka events table",
+      "done": true,
+      "result": "6 rows, 3 mismatches"
+    },
+    {
+      "id": "T014",
+      "title": "Pre-SDD work: frontend, assistant tools and providers, internal token",
+      "done": true,
+      "result": "7 tools, 2 providers"
+    },
+    {
+      "id": "T020",
+      "title": "Known gaps table; route new gaps to the roadmap",
+      "done": true,
+      "result": "12 gaps, 4 new backlog items"
+    },
+    {
+      "id": "T030",
+      "title": "Health measurement from a clean docker compose up",
+      "done": true,
+      "result": "10/10 HTTP 200"
+    },
+    {
+      "id": "T090",
+      "title": "Link baseline.md from architecture.md",
+      "done": true,
+      "result": "linked"
+    },
+    {
+      "id": "T091",
+      "title": "Definition-of-Done gates; packages/ unchanged",
+      "done": true,
+      "result": "check 12/12, build 0, 188 lines"
+    },
+    {
+      "id": "T092",
+      "title": "Tick ACs, update roadmap and memory",
+      "done": true,
+      "result": "verified"
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "Q1",
+      "text": "Where does the baseline live? Proposed: baseline.md in this folder, linked from architecture.md.",
+      "resolved": true
+    },
+    {
+      "id": "Q2",
+      "text": "Keep AC-6 (stack health via Docker) given no live model yet? Proposed: yes, health checks only.",
+      "resolved": true
+    },
+    {
+      "id": "Q3",
+      "text": "List frontend page routes too? Proposed: yes, as a short separate table.",
+      "resolved": true
+    },
+    {
+      "id": "Q4",
+      "text": "New gaps found: backlog or new Phase 0 feature? Proposed: backlog, unless cross-user data access.",
+      "resolved": true
+    }
+  ]
+}

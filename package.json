@@ -20,11 +20,11 @@
     "check": "node scripts/check.mjs",
     "dashboard": "node tools/spec-dashboard/scripts/start.mjs",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm test --workspaces --if-present",
+    "test": "vitest run",
     "seed": "node scripts/seed-data.js"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=26.0.0"
   },
   "license": "MIT",
   "dependencies": {
@@ -36,7 +36,8 @@
   "devDependencies": {
     "@types/node": "^26.5.1",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
     "esbuild@0.21.5": true,

@@ -3,8 +3,8 @@
   "folder": "004-spec-dashboard",
   "title": "Spec Dashboard",
   "phase": 0,
-  "status": "in-progress",
-  "stage": "implementing",
+  "status": "implemented",
+  "stage": "verified",
   "created": "2026-10-23",
   "updated": "2026-10-23",
   "summary": "A local web dashboard, running as its own process, that shows the roadmap, each feature's stage and progress, and the project memory, read from JSON tracking files kept in sync with the Markdown specs.",
@@ -43,7 +43,7 @@
       "id": "AC-6",
       "text": "Saving a file under specs/ or memory/ updates the open page within 3 seconds.",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-7",
@@ -177,7 +177,8 @@
     {
       "id": "T040",
       "title": "Manual checks and next build",
-      "done": false
+      "done": true,
+      "result": "AC-1/6/7/8 ok, 404/400, next build ok (NODE_ENV=production)"
     },
     {
       "id": "T090",
@@ -194,7 +195,8 @@
     {
       "id": "T092",
       "title": "Tick ACs, update roadmap and memory",
-      "done": false
+      "done": true,
+      "result": "ACs ticked, roadmap and memory updated"
     }
   ],
   "openQuestions": [

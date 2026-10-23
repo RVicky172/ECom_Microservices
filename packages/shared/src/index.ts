@@ -3,6 +3,7 @@ export * from './events';
 export * from './kafka';
 export * from './errors';
 export * from './jwt';
+export * from './identity';
 export * from './middleware/errorHandler';
 export * from './middleware/correlationId';
 export * from './middleware/internalAuth';

@@ -3,10 +3,12 @@ import { createLogger, correlationId, errorHandler, requireInternalToken } from 
 import inventoryRoutes from './routes/inventoryRoutes';
 import { runMigrations } from './models/inventoryModel';
 import { startConsumer } from './events/consumer';
+import type { SagaConsumerHandle } from '@ecommerce/shared';
 
 const logger = createLogger('inventory-service');
 const app = express();
 const PORT = process.env.PORT || 4005;
+let consumer: SagaConsumerHandle | undefined;
 
 declare global {
   namespace Express {
@@ -27,7 +29,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'inventory-service' });
+  res.json({ status: 'ok', service: 'inventory-service', consumer: consumer?.status() ?? 'starting' });
 });
 
 app.use('/api/v1/inventory', inventoryRoutes);
@@ -38,8 +40,9 @@ const start = async (): Promise<void> => {
   await runMigrations();
   logger.info('Database migrations complete');
 
-  // Start Kafka consumer to listen for order.created and payment.failed
-  await startConsumer(logger);
+  // Start the saga consumer; it keeps retrying until Kafka is ready (D-015)
+
+  consumer = startConsumer(logger);
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, 'Inventory Service started');

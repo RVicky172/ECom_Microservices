@@ -10,18 +10,20 @@
 
 ## Phase 0 — Foundation
 
-_Goal:_ what exists is recorded, the repo has a real test harness and CI, and known security gaps are closed.
+_Goal:_ what exists is recorded, the repo has a real test harness, and known security gaps are closed.
 
 | #   | Feature                                                                                                       | Spec | Status |
 | --- | ------------------------------------------------------------------------------------------------------------- | ---- | ------ |
-| 000 | Baseline: record current services, routes, events and known gaps as the starting point | — | ⬜ |
-| 001 | Test harness: Vitest across packages, wired into `npm test` and `npm run check`, first unit tests | — | ⬜ |
-| 002 | Ownership checks on `GET /orders/:id` and `GET /payments/:orderId` (users see only their own data) | — | ⬜ |
-| 003 | CI: GitHub Actions running check, test and build on every push and pull request | — | ⬜ |
-| 004 | Spec dashboard: local Next.js app showing roadmap, feature progress and memory, live | [spec](features/004-spec-dashboard/spec.md) | 🚧 |
+| 000 | Baseline: record current services, routes, events and known gaps as the starting point | [spec](features/000-baseline/spec.md) | ✔️ |
+| 001 | Test harness: Vitest across packages, wired into `npm test` and `npm run check`, first unit tests | [spec](features/001-test-harness/spec.md) | ✔️ |
+| 002 | Ownership checks on `GET /orders/:id` and `GET /payments/:orderId` (users see only their own data) | [spec](features/002-ownership-checks/spec.md) | ✔️ |
+| 004 | Spec dashboard: local Next.js app showing roadmap, feature progress and memory, live | [spec](features/004-spec-dashboard/spec.md) | ✔️ |
 
-**Exit criteria:** on a clean clone, `npm ci && npm run check && npm test && npm run build` pass, the same runs
-green in CI, and a user cannot read another user's order or payment.
+**Exit criteria:** on a clean clone, `npm ci && npm run check && npm test && npm run build` pass, and a user
+cannot read another user's order or payment. (CI was dropped from this phase on 2026-10-23 and moved to the
+backlog, D-012.)
+
+**Status:** ✔️ Phase 0 complete (2026-10-23): 000, 001, 002 and 004 done.
 
 ## Phase 1 — Checkout & Assistant
 
@@ -29,7 +31,7 @@ _Goal:_ checkout completes end to end through the saga, and the AI assistant rea
 
 | #   | Feature | Spec | Status |
 | --- | ------- | ---- | ------ |
-| 010 | Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED` | — | ⬜ |
+| 010 | Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED` | [spec](features/010-saga-payloads/spec.md) | ✔️ |
 | 011 | Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3) | — | ⬜ |
 | 012 | Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4) | — | ⬜ |
 
@@ -43,3 +45,12 @@ steps, and the assistant eval suite passes its agreed target on the configured m
 - Assistant: `assistant.interaction` analytics events; compaction for long conversations.
 - Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.
 - Server-side price lookup when adding to cart (the cart currently trusts the client's price).
+- Server-side prices when creating an order (the order total is computed from client-sent prices; 000 G8).
+- `order.shipped`: nothing produces it and notification has no handler (000 G9).
+- Durable idempotency for the order and notification Kafka consumers (000 G10).
+- Fresh clones start unprotected: generate `INTERNAL_SERVICE_TOKEN` in setup or refuse to start without it (000 G11).
+- Shared emits no type declarations: services see `@ecommerce/shared` as untyped and need it built before typecheck (found in 001).
+- CI: GitHub Actions running check, test and build on every push and pull request (was Phase 0 feature 003; moved to backlog 2026-10-23, D-012). Needs Node 26 and `shared` built before the service typecheck.
+- Persist Kafka data: the `kafka_data` volume is commented out in `docker-compose.yml`, so recreating Kafka wipes topics and consumer offsets (found in 010; 010 makes the saga robust to it).
+- Gateway rate limiter is mounted before `/health`, so a busy client (or scripted tests) makes the gateway's health check return 429 (found in 010 verify).
+- Order list shows "0 items": `GET /orders` returns orders without their items, and the storefront counts `order.items` (found in 010 T034).

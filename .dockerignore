@@ -1,0 +1,2 @@
+# Unit tests (feature 001) never ship in an image.
+**/*.test.ts

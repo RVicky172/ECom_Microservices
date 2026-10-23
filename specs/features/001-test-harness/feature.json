@@ -1,0 +1,49 @@
+{
+  "id": "001",
+  "folder": "001-test-harness",
+  "title": "Test Harness",
+  "phase": 0,
+  "status": "implemented",
+  "stage": "verified",
+  "created": "2026-10-23",
+  "updated": "2026-10-23",
+  "summary": "Fast, offline Vitest unit tests across packages/, wired into npm test and npm run check so a failing test blocks a task, plus first tests on shared order transitions, JWT helpers and the internal token middleware.",
+  "acceptanceCriteria": [
+    { "id": "AC-1", "text": "npm test from the root runs every package's unit tests, prints per-file results and exits 0 when all pass.", "test": "manual measurement", "done": true },
+    { "id": "AC-2", "text": "A failing assertion makes npm test exit non-zero and name the failing file and test.", "test": "manual measurement", "done": true },
+    { "id": "AC-3", "text": "A failing assertion makes npm run check report FAIL and exit non-zero; restored, it passes.", "test": "manual measurement", "done": true },
+    { "id": "AC-4", "text": "A new src/**/*.test.ts in a package without tests runs with no config or package.json edit.", "test": "manual measurement", "done": true },
+    { "id": "AC-5", "text": "With Docker stopped and no network, all tests pass; no test opens a socket to a database, Kafka or model API.", "test": "manual measurement", "done": true },
+    { "id": "AC-6", "text": "The whole unit suite completes in 30 seconds or less on the dev machine.", "test": "manual measurement", "done": true },
+    { "id": "AC-7", "text": "Order transitions: all listed accepted, at least 3 unlisted (incl. from terminal) rejected, every status has an entry.", "test": "unit", "done": true },
+    { "id": "AC-8", "text": "JWT: round trip verifies; expired, wrong-secret and modified tokens rejected; expiry uses controlled time.", "test": "unit", "done": true },
+    { "id": "AC-9", "text": "Internal token middleware: right token passes, missing/wrong gets 401, /health open; unset token behaviour pinned.", "test": "unit", "done": true },
+    { "id": "AC-10", "text": "Each AC-7..AC-9 test seen failing by briefly breaking the code; recorded in tasks.md.", "test": "manual measurement", "done": true },
+    { "id": "AC-11", "text": "npm run build succeeds and no test file ends up in any build output or Docker image.", "test": "manual measurement", "done": true },
+    { "id": "AC-12", "text": "testing-strategy.md, tech-stack.md, CLAUDE.md and README.md describe the real npm test.", "test": "manual review", "done": true }
+  ],
+  "tasks": [
+    { "id": "T001", "title": "Spike: install Vitest 5, root config, trivial tests in shared and frontend", "done": true },
+    { "id": "T002", "title": "Add the unit tests job to npm run check", "done": true },
+    { "id": "T003", "title": "tsconfig.build.json in 9 packages, build scripts, .dockerignore", "done": true },
+    { "id": "T010", "title": "Failing tests for order transitions (canTransitionOrder)", "done": true },
+    { "id": "T011", "title": "Tests for JWT helpers with fake timers", "done": true },
+    { "id": "T012", "title": "Tests for requireInternalToken middleware", "done": true },
+    { "id": "T013", "title": "Add canTransitionOrder to shared, use it in orderService", "done": true },
+    { "id": "T014", "title": "Frontend smoke test for storePresentation", "done": true },
+    { "id": "T020", "title": "Measure: clean install, new-file pickup, failure output, timing", "done": true },
+    { "id": "T021", "title": "Offline run with Docker stopped and no network", "done": true },
+    { "id": "T022", "title": "Dockerfiles to node:26-alpine, root engines >=26", "done": true },
+    { "id": "T023", "title": "Docker images free of tests; every service healthy", "done": true },
+    { "id": "T090", "title": "Docs: testing-strategy, CLAUDE.md, README, architecture", "done": true },
+    { "id": "T091", "title": "All Definition-of-Done gates green", "done": true },
+    { "id": "T092", "title": "Tick ACs, Status Implemented, roadmap and memory", "done": true }
+  ],
+  "openQuestions": [
+    { "id": "Q1", "text": "Frontend in scope? Proposed: pure TS modules only, Node environment, no DOM tests.", "resolved": true },
+    { "id": "Q2", "text": "First tests = order transitions, JWT, internal token middleware in shared? Proposed: yes.", "resolved": true },
+    { "id": "Q3", "text": "Should npm test also run the spec dashboard tests? Proposed: no; npm run check runs both.", "resolved": true },
+    { "id": "Q4", "text": "Coverage gate or report? Proposed: neither for now.", "resolved": true },
+    { "id": "Q5", "text": "Is 30 s the right unit-suite budget? Proposed: yes.", "resolved": true }
+  ]
+}

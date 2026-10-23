@@ -5,37 +5,31 @@
     {
       "number": 0,
       "title": "Foundation",
-      "goal": "What exists is recorded, the repo has a real test harness and CI, and known security gaps are closed.",
-      "exitCriteria": "On a clean clone, `npm ci && npm run check && npm test && npm run build` pass, the same runs green in CI, and a user cannot read another user's order or payment.",
+      "goal": "What exists is recorded, the repo has a real test harness, and known security gaps are closed.",
+      "exitCriteria": "On a clean clone, `npm ci && npm run check && npm test && npm run build` pass, and a user cannot read another user's order or payment. (CI moved to the backlog on 2026-10-23, D-012.)",
       "features": [
         {
           "id": "000",
           "name": "Baseline: record current services, routes, events and known gaps as the starting point",
-          "status": "not-started",
-          "folder": null
+          "status": "done",
+          "folder": "000-baseline"
         },
         {
           "id": "001",
           "name": "Test harness: Vitest across packages, wired into `npm test` and `npm run check`, first unit tests",
-          "status": "not-started",
-          "folder": null
+          "status": "done",
+          "folder": "001-test-harness"
         },
         {
           "id": "002",
           "name": "Ownership checks on `GET /orders/:id` and `GET /payments/:orderId` (users see only their own data)",
-          "status": "not-started",
-          "folder": null
-        },
-        {
-          "id": "003",
-          "name": "CI: GitHub Actions running check, test and build on every push and pull request",
-          "status": "not-started",
-          "folder": null
+          "status": "done",
+          "folder": "002-ownership-checks"
         },
         {
           "id": "004",
           "name": "Spec dashboard: local Next.js app showing roadmap, feature progress and memory, live",
-          "status": "in-progress",
+          "status": "done",
           "folder": "004-spec-dashboard"
         }
       ]
@@ -49,8 +43,8 @@
         {
           "id": "010",
           "name": "Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED`",
-          "status": "not-started",
-          "folder": null
+          "status": "done",
+          "folder": "010-saga-payloads"
         },
         {
           "id": "011",
@@ -72,6 +66,15 @@
     "Shared rate limiting (the gateway limiter is per process, in memory).",
     "Assistant: `assistant.interaction` analytics events; compaction for long conversations.",
     "Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.",
-    "Server-side price lookup when adding to cart (the cart currently trusts the client's price)."
+    "Server-side price lookup when adding to cart (the cart currently trusts the client's price).",
+    "Server-side prices when creating an order (the order total is computed from client-sent prices; 000 G8).",
+    "`order.shipped`: nothing produces it and notification has no handler (000 G9).",
+    "Durable idempotency for the order and notification Kafka consumers (000 G10).",
+    "Fresh clones start unprotected: generate `INTERNAL_SERVICE_TOKEN` in setup or refuse to start without it (000 G11).",
+    "Shared emits no type declarations: services see `@ecommerce/shared` as untyped and need it built before typecheck (found in 001).",
+    "CI: GitHub Actions running check, test and build on every push and pull request (was Phase 0 feature 003; moved to backlog 2026-10-23, D-012). Needs Node 26 and `shared` built before the service typecheck.",
+    "Persist Kafka data: the `kafka_data` volume is commented out in `docker-compose.yml`, so recreating Kafka wipes topics and consumer offsets (found in 010; 010 makes the saga robust to it).",
+    "Gateway rate limiter is mounted before `/health`, so a busy client (or scripted tests) makes the gateway's health check return 429 (found in 010 verify).",
+    "Order list shows \"0 items\": `GET /orders` returns orders without their items, and the storefront counts `order.items` (found in 010 T034)."
   ]
 }

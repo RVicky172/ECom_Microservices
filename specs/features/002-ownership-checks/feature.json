@@ -1,0 +1,50 @@
+{
+  "id": "002",
+  "folder": "002-ownership-checks",
+  "title": "Ownership Checks on Orders and Payments",
+  "phase": 0,
+  "status": "implemented",
+  "stage": "verified",
+  "created": "2026-10-23",
+  "updated": "2026-10-23",
+  "summary": "GET /orders/:id and GET /payments/:orderId return a record only to its owner; anyone else gets the same 404 as for a missing record. Closes baseline gaps G1 and G2 and Phase 0's security exit criterion.",
+  "acceptanceCriteria": [
+    { "id": "AC-1", "text": "Owner gets their order through the gateway: 200, same body as today.", "test": "unit + manual integration", "done": true },
+    { "id": "AC-2", "text": "Non-owner gets 404 identical to a non-existent order; nothing reveals the order exists.", "test": "unit + manual integration", "done": true },
+    { "id": "AC-3", "text": "Owner gets the payment for their order: 200, same body as today.", "test": "unit + manual integration", "done": true },
+    { "id": "AC-4", "text": "Non-owner gets 404 for the payment, identical to an order with no payment.", "test": "unit + manual integration", "done": true },
+    { "id": "AC-5", "text": "Missing x-user-id on GET /orders/:id, GET /orders or GET /payments/:orderId gives 401, no data.", "test": "unit", "done": true },
+    { "id": "AC-6", "text": "A non-UUID ID gives 404, not 500, on both endpoints.", "test": "unit + manual integration", "done": true },
+    { "id": "AC-7", "text": "Order list, order creation, saga and the assistant's own-order answers are unchanged.", "test": "manual integration", "done": true },
+    { "id": "AC-8", "text": "Ownership unit-tested both ways for both endpoints; each test seen failing with the check removed.", "test": "unit + manual measurement", "done": true },
+    { "id": "AC-9", "text": "Changed services rebuilt and healthy; AC-1, AC-2, AC-4 re-run through the gateway with real tokens.", "test": "manual integration", "done": true },
+    { "id": "AC-10", "text": "Baseline G1/G2 closed, learnings entry updated, service READMEs and architecture describe the rule.", "test": "manual review", "done": true }
+  ],
+  "tasks": [
+    { "id": "T001", "title": "Baseline: record the leak and the 500 through the gateway before changes", "done": true },
+    { "id": "T010", "title": "Failing tests for requireUserId and isUuid", "done": true },
+    { "id": "T011", "title": "Failing tests for getOrderForUser", "done": true },
+    { "id": "T012", "title": "Failing tests for order controller guards", "done": true },
+    { "id": "T013", "title": "Failing tests for payment orderClient.isOrderOwnedBy", "done": true },
+    { "id": "T014", "title": "Failing tests for getPaymentForUser", "done": true },
+    { "id": "T015", "title": "Failing tests for payment controller guard", "done": true },
+    { "id": "T020", "title": "Implement shared identity helpers", "done": true },
+    { "id": "T021", "title": "Implement order ownership check and controller guards", "done": true },
+    { "id": "T022", "title": "Implement payment ownership via order service", "done": true },
+    { "id": "T023", "title": "Update assistant comments", "done": true },
+    { "id": "T030", "title": "Rebuild all services; re-run order checks through the gateway", "done": true },
+    { "id": "T031", "title": "Payment checks with a temporary test row", "done": true },
+    { "id": "T032", "title": "No regressions: list, create, logs, assistant", "done": true },
+    { "id": "T090", "title": "Docs: baseline, learnings, READMEs, architecture, testing strategy", "done": true },
+    { "id": "T091", "title": "All Definition-of-Done gates green", "done": true },
+    { "id": "T092", "title": "Tick ACs, Status Implemented, roadmap and memory", "done": true }
+  ],
+  "openQuestions": [
+    { "id": "Q1", "text": "Non-owner response 404 or 403? Proposed: 404.", "resolved": true },
+    { "id": "Q2", "text": "Any role bypasses the check? Proposed: no admin bypass.", "resolved": true },
+    { "id": "Q3", "text": "Fix malformed IDs to 404 instead of 500 here? Proposed: yes.", "resolved": true },
+    { "id": "Q4", "text": "Where does payment ownership come from? Proposed: ask the order service; AC-3 proven with a test payment row (G3).", "resolved": true },
+    { "id": "Q5", "text": "Assistant drops its own ownership check? Proposed: no, keep it; fix its comment.", "resolved": true },
+    { "id": "Q6", "text": "GET /orders list also rejects missing x-user-id with 401? Proposed: yes.", "resolved": true }
+  ]
+}

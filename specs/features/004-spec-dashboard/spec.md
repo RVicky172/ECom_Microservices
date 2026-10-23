@@ -1,6 +1,6 @@
 # 004 — Spec Dashboard
 
-**Status:** In Progress <!-- Draft | Approved | In Progress | Implemented | Superseded -->
+**Status:** Implemented <!-- Draft | Approved | In Progress | Implemented | Superseded -->
 **Roadmap phase:** 0 · **Created:** 2026-10-23 · **Owner:** RVicky172
 
 ## Summary
@@ -42,7 +42,7 @@ many files; the dashboard makes "where are we and what's next" visible without o
   `tasks.md`. _(manual: page)_
 - [x] **AC-5:** Given `memory/`, when I open the memory view, then I see "Current State" from `MEMORY.md`, the 5
   newest `progress.md` entries, and all decisions (`D-NNN`) and learnings. _(unit: memory parser · manual)_
-- [ ] **AC-6:** Given the dashboard is open, when a file under `specs/` or `memory/` is saved, then the open page
+- [x] **AC-6:** Given the dashboard is open, when a file under `specs/` or `memory/` is saved, then the open page
   shows the change within 3 seconds without a manual reload. _(manual measurement)_
 - [x] **AC-7:** Given a missing or invalid tracking file (no `roadmap.json`, a feature folder without
   `feature.json`, malformed JSON, or a value that breaks the schema), when the dashboard loads, then it still
@@ -87,3 +87,4 @@ many files; the dashboard makes "where are we and what's next" visible without o
 - 2026-10-23 — Changed at RVicky172's request: tracking state moves to JSON (`specs/roadmap.json`, per-feature
   `feature.json`) instead of the dashboard parsing Markdown. AC-2/3/4/7 now read JSON; AC-9 added to keep JSON
   and Markdown in sync via `npm run check`; isolation NFR updated (D-005).
+- 2026-10-23 — Verified: all 9 ACs proven; status Implemented.

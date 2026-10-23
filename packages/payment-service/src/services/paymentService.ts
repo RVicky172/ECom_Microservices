@@ -1,5 +1,6 @@
 import { db } from '../models/paymentModel';
-import { ConflictError, NotFoundError } from '@ecommerce/shared';
+import { ConflictError, NotFoundError, isUuid } from '@ecommerce/shared';
+import { isOrderOwnedBy } from '../clients/orderClient';
 
 interface Payment {
   id: string;
@@ -13,41 +14,39 @@ interface Payment {
 
 /**
  * Idempotent payment processing (Section 11).
+ * Success is simulated: a draw below `PAYMENT_SUCCESS_RATE` (default 0.85) succeeds.
+ * `draw` is injectable so tests decide the outcome instead of chance.
  */
 export const processPayment = async (
   orderId: string,
   amount: number,
-  idempotencyKey: string
+  idempotencyKey: string,
+  draw: () => number = Math.random,
 ): Promise<Payment> => {
   let result: Payment | undefined;
 
   await db.transaction(async (trx: any) => {
-    // 1. Check idempotency key (Atomic INSERT)
-    try {
-      await trx('idempotency_keys').insert({
-        key: idempotencyKey,
-        status: 'IN_PROGRESS',
-      });
-    } catch (err: any) {
-      if (err.code === '23505') {
-        // unique_violation
-        const existingKey = await trx('idempotency_keys')
-          .where({ key: idempotencyKey })
-          .first();
-        if (existingKey.status === 'IN_PROGRESS') {
-          throw new ConflictError('Payment is already being processed');
-        }
-        if (existingKey.status === 'COMPLETED' || existingKey.status === 'FAILED') {
-          result = existingKey.response_body;
-          return; // Return early, don't re-process
-        }
+    // 1. Claim the idempotency key (atomic INSERT … ON CONFLICT DO NOTHING). A plain insert of an
+    //    existing key raises a unique violation, which aborts this PostgreSQL transaction, so the
+    //    stored result could never be read back (found in 010 T033).
+    const claimed = await trx('idempotency_keys')
+      .insert({ key: idempotencyKey, status: 'IN_PROGRESS' })
+      .onConflict('key')
+      .ignore()
+      .returning('key');
+
+    if (claimed.length === 0) {
+      const existingKey = await trx('idempotency_keys').where({ key: idempotencyKey }).first();
+      if (existingKey.status === 'IN_PROGRESS') {
+        throw new ConflictError('Payment is already being processed');
       }
-      throw err;
+      result = existingKey.response_body;
+      return; // Already COMPLETED or FAILED: return the stored result, don't re-process
     }
 
     // 2. Process payment (simulated with random success rate)
     const successRate = parseFloat(process.env.PAYMENT_SUCCESS_RATE || '0.85');
-    const isSuccess = Math.random() < successRate;
+    const isSuccess = draw() < successRate;
     const status = isSuccess ? 'COMPLETED' : 'FAILED';
     const gatewayTxId = `sim_tx_${Date.now()}`;
 
@@ -77,7 +76,15 @@ export const processPayment = async (
   return result!;
 };
 
-export const getPayment = async (orderId: string): Promise<Payment> => {
+/**
+ * The payment for an order, only if the order belongs to `userId`. Ownership is
+ * checked first (through the order service), so someone else's order gets the same
+ * NotFoundError as an order without a payment, whether or not one exists.
+ */
+export const getPaymentForUser = async (orderId: string, userId: string, correlationId?: string): Promise<Payment> => {
+  if (!isUuid(orderId)) throw new NotFoundError('Payment');
+  if (!(await isOrderOwnedBy(orderId, userId, correlationId))) throw new NotFoundError('Payment');
+
   const payment = (await db('payments').where({ order_id: orderId }).first()) as
     | Payment
     | undefined;

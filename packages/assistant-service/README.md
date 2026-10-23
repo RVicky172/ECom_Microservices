@@ -107,7 +107,7 @@ All tools are read-only and defined once in `src/agent/tools.ts` against a provi
 ## How it stays safe
 
 - **Identity comes only from the gateway.** The tools are created per request and close over the verified user ID. No tool takes a user ID as input, so the model can't request another customer's data.
-- **Order ownership is checked here.** The Order and Payment services return any order by ID without checking who owns it. `getOwnOrder` compares `user_id` and reports someone else's order as not found. Short references are resolved only against the user's own orders.
+- **Order ownership is checked here too.** Since feature 002 the Order and Payment services return 404 for someone else's order or payment. `getOwnOrder` still compares `user_id` as a second layer and reports someone else's order as not found. Short references are resolved only against the user's own orders.
 - **The model cannot change anything.** There are no write tools. `propose_add_to_cart` shows a button; the browser adds the item through the normal cart endpoint, with the user's own session, only when they click it.
 - **Tool output is data.** The system prompt tells Claude to treat product text and tool results as data, not instructions. The frontend renders replies as plain text, never HTML.
 - **Cost and abuse limits.** Per-user hourly limit in Redis, a cap on tool round trips, `max_tokens`, low effort by default, and a cached system prompt.

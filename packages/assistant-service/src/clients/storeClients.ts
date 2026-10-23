@@ -84,8 +84,9 @@ export const listOrders = async (ctx: RequestContext, limit = 10): Promise<Order
 /**
  * One order, only if it belongs to the current user.
  *
- * The order service's `GET /orders/:id` does not check ownership, so this
- * check is mandatory here. Someone else's order is reported as not found.
+ * The order service's `GET /orders/:id` enforces ownership itself (feature 002:
+ * someone else's order is a 404); this check is a second layer. Someone else's
+ * order is reported as not found.
  */
 export const getOwnOrder = async (ctx: RequestContext, orderId: string): Promise<OrderDetail | null> => {
   try {
@@ -100,7 +101,10 @@ export const getOwnOrder = async (ctx: RequestContext, orderId: string): Promise
   }
 };
 
-/** Payment for an order the caller has already verified belongs to the user. */
+/**
+ * Payment for an order the caller has already verified belongs to the user.
+ * The payment service also checks ownership (through the order service).
+ */
 export const getPaymentForOrder = async (ctx: RequestContext, orderId: string): Promise<Payment | null> => {
   try {
     return await getJson<Payment>('payment', `/api/v1/payments/${encodeURIComponent(orderId)}`, ctx);

@@ -73,14 +73,21 @@ anything surprising or deferred. Keep `feature.json` in step (same ids, same don
 
 ## Verify
 
-- [ ] **T040** — Manual checks: AC-1 (port, store not needed), AC-6 (≤ 3 s), AC-7 (broken JSON shows a
+- [x] **T040** — Manual checks: AC-1 (port, store not needed), AC-6 (≤ 3 s), AC-7 (broken JSON shows a
       message), AC-8 (`git status` clean), unknown folder → 404; `next build` succeeds
+      **Result (2026-10-23):** AC-1 ✔ (127.0.0.1:3100 only; Docker and ports 3000/4000/4001 down; `/` 200 in
+      0.07 s). AC-7 ✔ (malformed `feature.json` → "invalid JSON: Expected double-quoted property name…"; bad
+      `status` → "status: Invalid option…"; missing `roadmap.json` → "file not found"; rest of page renders).
+      AC-8 ✔ (`git status` unchanged after all pages). `/features/999-nope` → 404, `..%2F` → 400. `next build`
+      ✔ with `NODE_ENV=production` (fails with the shell's `NODE_ENV=development`, see learnings).
+      AC-6 ✔ confirmed by RVicky172 in a browser: saving `memory/MEMORY.md` updated the open `/memory` page
+      within seconds, no reload (server-side signal ~310 ms).
 - [x] **T090** — Update `specs/architecture.md`, `specs/tech-stack.md`, `tools/spec-dashboard/README.md`, root
       README pointer.
       **Result (2026-10-23):** architecture.md (layout + tracking section), tech-stack.md (Developer Tools), tools/spec-dashboard/README.md, root README.
 - [x] **T091** — Every Definition-of-Done gate green (`npm run check`, `npm run build`); record the numbers.
       **Result (2026-10-23):** root `npm run check`: all 12 checks pass; root `npm run build`: exit 0 (8.9 s); dashboard `next build`: compiled, no warnings after the turbopackIgnore fix.
-- [ ] **T092** — Tick ACs in `spec.md` and `feature.json` (status `implemented`), update `roadmap.md` and
+- [x] **T092** — Tick ACs in `spec.md` and `feature.json` (status `implemented`), update `roadmap.md` and
       `roadmap.json`, `memory/progress.md`, `memory/MEMORY.md`.
 
 ## AC coverage

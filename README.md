@@ -112,7 +112,7 @@ the [AI shopping assistant design and plan](docs/ai-shopping-assistant.md).
 ### Backend
 | Technology | Version | Purpose |
 |-----------|---------|---------|
-| Node.js | 20 LTS | Runtime for all services |
+| Node.js | 26 | Runtime for all services (`node:26-alpine` images) |
 | TypeScript | 7.0.2 (root), 5.3.3 (workspace tooling) | Static typing and compilation |
 | Express | 4.x | HTTP framework |
 | KafkaJS | 2.x | Apache Kafka client (producer/consumer) |
@@ -167,7 +167,7 @@ the [AI shopping assistant design and plan](docs/ai-shopping-assistant.md).
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (v24+)
-- [Node.js](https://nodejs.org/) (v20 LTS) — only needed for local dev without Docker
+- [Node.js](https://nodejs.org/) (v26) — for local dev without Docker and for running the unit tests
 - [Git](https://git-scm.com/)
 
 ### Run the Complete Platform with Docker Compose
@@ -629,15 +629,21 @@ is not set up and the store works as usual.
 ## 🧪 Testing
 
 ```bash
-# Run all tests
+# Run every unit test (Vitest; packages/*/src/**/*.test.ts)
 npm test
 
-# Run tests for a specific service
-npm test --workspace=packages/order-service
+# Run one package's tests
+npx vitest run --project shared
 
-# Run with coverage
-npm test -- --coverage
+# Watch mode while writing tests
+npx vitest
+
+# The fast gate: typecheck every package + unit tests
+npm run check
 ```
+
+Unit tests need no Docker stack or network. Put a `<name>.test.ts` next to the code it covers; it is picked up
+automatically. Integration checks against the running stack are manual. See `specs/testing-strategy.md`.
 
 ---
 

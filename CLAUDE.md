@@ -40,8 +40,8 @@ microservices behind an API gateway, with a React storefront and an AI shopping 
 ## Commands
 
 ```bash
-npm run check  # fast gate — typechecks all packages; must pass before any task is ticked
-npm test       # unit tests (none yet — the harness arrives with feature 001)
+npm run check  # fast gate — typechecks all packages and runs unit tests; must pass before any task is ticked
+npm test       # unit tests (Vitest, packages/*/src/**/*.test.ts; needs Node ≥ 26)
 npm run build  # production build of every package
 npm run dashboard  # spec dashboard on http://127.0.0.1:3100 (separate process, live)
 

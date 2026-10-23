@@ -35,6 +35,8 @@ export interface Order {
   id: string;
   status: string;
   total_amount: NumericValue;
+  /** Why the order was cancelled: `OUT_OF_STOCK` or `PAYMENT_DECLINED` (null otherwise). */
+  cancel_reason?: string | null;
   items?: Array<CartItem & { product_name?: string }>;
 }
 

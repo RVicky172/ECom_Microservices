@@ -11,7 +11,7 @@
 
 | Concern | Choice | Why |
 | ------- | ------ | --- |
-| Language | TypeScript on Node.js 20 | One language across services and frontend |
+| Language | TypeScript on Node.js 26 (`node:26-alpine` images; D-009) | One language across services and frontend; latest release line |
 | HTTP framework | Express 4 | Simple, well known; shared middleware in `@ecommerce/shared` |
 | Gateway proxy | http-proxy-middleware 3 | Streams responses (needed for assistant SSE) |
 | Relational data | PostgreSQL 16 via Knex 3 | Orders, inventory, payments and auth need transactions |
@@ -29,13 +29,13 @@
 | Concern | Choice |
 | ------- | ------ |
 | Package manager | npm workspaces (`packages/*`) |
-| Runtime | Node.js ≥ 20 |
+| Runtime | Node.js ≥ 26 |
 | Typecheck | `tsc --noEmit` per package via `npm run check` (`scripts/check.mjs`) |
 | Dev servers | ts-node (services), tsx (gateway), Vite (frontend) |
 | Containers | Docker Compose (`docker-compose.yml`, `docker-compose.infra.yml`) |
-| Unit tests | none yet — Vitest planned (feature 001) |
+| Unit tests | Vitest 5 — root dev dependency, one project per `packages/*` (feature 001, D-008) |
 | Lint / format | none yet |
-| CI | none yet — GitHub Actions planned (feature 003) |
+| CI | none yet — GitHub Actions in the backlog (D-012) |
 
 ## Developer Tools
 

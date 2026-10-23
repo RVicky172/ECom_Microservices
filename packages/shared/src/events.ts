@@ -1,3 +1,5 @@
+import { ValidationError } from './errors';
+
 /**
  * Kafka topic names and event type constants.
  * Central registry so producers and consumers stay in sync.
@@ -42,4 +44,136 @@ export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
   [OrderStatus.DELIVERED]: [],
   [OrderStatus.CANCELLED]: [],
+};
+
+/**
+ * True when an order may move from `from` to `to`. Statuses outside `OrderStatus`
+ * (e.g. a corrupt row) are never allowed to move.
+ */
+export const canTransitionOrder = (from: string, to: string): boolean =>
+  (VALID_ORDER_TRANSITIONS[from as OrderStatus] ?? []).includes(to as OrderStatus);
+
+/**
+ * Why an order was cancelled; stored on the order and shown to the shopper (feature 010).
+ */
+export const CANCEL_REASONS = ['OUT_OF_STOCK', 'PAYMENT_DECLINED'] as const;
+export type CancelReason = (typeof CANCEL_REASONS)[number];
+
+/**
+ * Saga event payloads (the `data` of each Kafka message). Producers build these
+ * and consumers read them through the parsers below, so the two cannot drift
+ * apart (Constitution V: change producer, consumers and this file together).
+ */
+export interface SagaItem {
+  productId: string;
+  quantity: number;
+  productName?: string;
+  price?: number;
+}
+
+export interface OrderCreatedData {
+  orderId: string;
+  userId: string;
+  items: SagaItem[];
+  totalAmount: number;
+}
+
+/** Forwards what payment needs from `order.created` (was only `orderId`: gap G3). */
+export interface InventoryReservedData {
+  orderId: string;
+  userId: string;
+  items: SagaItem[];
+  totalAmount: number;
+}
+
+export interface InventoryRejectedData {
+  orderId: string;
+  reason: 'OUT_OF_STOCK';
+}
+
+/** Carries the items so inventory can finalize or release them (were `undefined`: gap G4). */
+export interface PaymentCompletedData {
+  orderId: string;
+  items: SagaItem[];
+  amount: number;
+}
+
+export interface PaymentFailedData {
+  orderId: string;
+  items: SagaItem[];
+  amount: number;
+  reason: 'PAYMENT_DECLINED';
+}
+
+/** The envelope every saga message carries; `data` is one of the payloads above. */
+export interface SagaEnvelope {
+  eventId: string;
+  eventType: string;
+  aggregateId: string;
+  data: unknown;
+  timestamp: string;
+}
+
+type Fields = Record<string, unknown>;
+
+const reader = (event: string, data: unknown) => {
+  const invalid = (field: string) => new ValidationError(`${event}: ${field} missing or invalid`);
+  if (typeof data !== 'object' || data === null) throw invalid('payload');
+  const fields = data as Fields;
+
+  const text = (field: string): string => {
+    const value = fields[field];
+    if (typeof value !== 'string' || value.trim() === '') throw invalid(field);
+    return value;
+  };
+  const amount = (field: string): number => {
+    const value = fields[field];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw invalid(field);
+    return value;
+  };
+  const items = (): SagaItem[] => {
+    const value = fields.items;
+    if (!Array.isArray(value) || value.length === 0) throw invalid('items');
+    return value.map((item: Fields) => {
+      if (typeof item?.productId !== 'string' || !Number.isInteger(item.quantity) || (item.quantity as number) < 1) {
+        throw invalid('items');
+      }
+      return { ...item } as unknown as SagaItem;
+    });
+  };
+  const literal = <T extends string>(field: string, expected: T): T => {
+    if (fields[field] !== expected) throw invalid(field);
+    return expected;
+  };
+  return { text, amount, items, literal };
+};
+
+export const parseOrderCreated = (data: unknown): OrderCreatedData => {
+  const read = reader('order.created', data);
+  return { orderId: read.text('orderId'), userId: read.text('userId'), items: read.items(), totalAmount: read.amount('totalAmount') };
+};
+
+export const parseInventoryReserved = (data: unknown): InventoryReservedData => {
+  const read = reader('inventory.reserved', data);
+  return { orderId: read.text('orderId'), userId: read.text('userId'), items: read.items(), totalAmount: read.amount('totalAmount') };
+};
+
+export const parseInventoryRejected = (data: unknown): InventoryRejectedData => {
+  const read = reader('inventory.rejected', data);
+  return { orderId: read.text('orderId'), reason: read.literal('reason', 'OUT_OF_STOCK') };
+};
+
+export const parsePaymentCompleted = (data: unknown): PaymentCompletedData => {
+  const read = reader('payment.completed', data);
+  return { orderId: read.text('orderId'), items: read.items(), amount: read.amount('amount') };
+};
+
+export const parsePaymentFailed = (data: unknown): PaymentFailedData => {
+  const read = reader('payment.failed', data);
+  return {
+    orderId: read.text('orderId'),
+    items: read.items(),
+    amount: read.amount('amount'),
+    reason: read.literal('reason', 'PAYMENT_DECLINED'),
+  };
 };

@@ -1,10 +1,12 @@
 import express from 'express';
 import { createLogger, correlationId } from '@ecommerce/shared';
 import { startConsumer } from './events/consumer';
+import type { SagaConsumerHandle } from '@ecommerce/shared';
 
 const logger = createLogger('notification-service');
 const app = express();
 const PORT = process.env.PORT || 4007;
+let consumer: SagaConsumerHandle | undefined;
 
 declare global {
   namespace Express {
@@ -24,11 +26,11 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'notification-service' });
+  res.json({ status: 'ok', service: 'notification-service', consumer: consumer?.status() ?? 'starting' });
 });
 
 const start = async (): Promise<void> => {
-  await startConsumer(logger);
+  consumer = startConsumer(logger); // retries until Kafka is ready (D-015)
 
   app.listen(PORT, () => {
     logger.info({ port: PORT }, 'Notification Service started');

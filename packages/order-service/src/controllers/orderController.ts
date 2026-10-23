@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
+import { requireUserId } from '@ecommerce/shared';
 import * as orderService from '../services/orderService';
 
 interface CreateOrderItem {
@@ -52,10 +53,10 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
 
 export const getOrders = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const userId = req.headers['x-user-id'];
+    const userId = requireUserId(req);
     const { page = 1, limit = 20 } = req.query;
     const orders = await orderService.getOrdersByUserId(
-      String(userId),
+      userId,
       parseInt(String(page), 10),
       parseInt(String(limit), 10)
     );
@@ -67,7 +68,8 @@ export const getOrders = async (req: Request, res: Response, next: NextFunction)
 
 export const getOrderById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const order = await orderService.getOrderById(req.params.id);
+    const userId = requireUserId(req);
+    const order = await orderService.getOrderForUser(req.params.id, userId);
     res.json(order);
   } catch (err) {
     next(err);

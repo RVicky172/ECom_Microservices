@@ -5,6 +5,9 @@
 
 **Last updated:** 2026-10-23
 
+Point-in-time record of every service, route, event and known gap at the start of SDD (commit `e9685bf`):
+[`features/000-baseline/baseline.md`](features/000-baseline/baseline.md).
+
 ## Directory Layout
 
 ```
@@ -23,7 +26,8 @@ Microservices/
 │   └── frontend/             # :3000 React + Vite SPA (React Router, Redux Toolkit Query)
 ├── docs/                     # design documents (ai-shopping-assistant.md)
 ├── tools/spec-dashboard/     # :3100 local Next.js dashboard for specs/ and memory/ (own package, not a workspace)
-├── scripts/                  # DB init, seed data, check.mjs (fast gate)
+├── scripts/                  # DB init, seed data, check.mjs (fast gate: typecheck + unit tests)
+├── vitest.config.mts         # unit tests: one Vitest project per packages/* directory
 ├── specs/ · memory/          # spec-driven workflow and project memory; specs/*.json = tracking state
 ├── docker-compose.yml        # full stack · docker-compose.infra.yml: infrastructure only
 └── .env.example              # every environment variable, documented
@@ -51,8 +55,33 @@ Inventory has no gateway route; it is reached internally and through Kafka.
 
 `order.created` (via the order outbox) → inventory reserves → `inventory.reserved` | `inventory.rejected` →
 payment → `payment.completed` | `payment.failed` → order `CONFIRMED` | `CANCELLED`; notification consumes events.
-Topic and event names: `packages/shared/src/events.ts`. Known gap: the `inventory.reserved` payload lacks the
-amount/items the payment consumer expects (roadmap 010).
+Topic names, event types **and payloads** live in `packages/shared/src/events.ts`. Producers build the payload
+types and consumers read them through the shared parsers (`parseInventoryReserved`, …), so a missing field fails
+loudly (feature 010; G3/G4 closed).
+
+| Topic | Producer | Consumers | `data` |
+| ----- | -------- | --------- | ------ |
+| `order.created` | order (outbox) | inventory, notification | `orderId, userId, items[{productId, productName, price, quantity}], totalAmount` |
+| `inventory.reserved` | inventory | order, payment | `orderId, userId, items, totalAmount` |
+| `inventory.rejected` | inventory | order | `orderId, reason: 'OUT_OF_STOCK'` |
+| `payment.completed` | payment | order, inventory, notification | `orderId, items, amount` |
+| `payment.failed` | payment | order, inventory, notification | `orderId, items, amount, reason: 'PAYMENT_DECLINED'` |
+
+Rules:
+
+- **Consumer start:** every saga consumer starts through shared `startSagaConsumer`. It ensures the topics exist,
+  subscribes with `fromBeginning: true` and retries with backoff (1 s up to 30 s) instead of giving up. A service
+  never runs without its consumer. `/health` reports `consumer: starting | running`.
+- **Idempotency:** a duplicate event changes nothing:
+  - inventory keeps `processed_events`;
+  - payment keeps idempotency keys (`insert … on conflict do nothing`), and its outcome events reuse a v5 UUID
+    derived from the incoming event ID;
+  - order applies `nextTransitions(status, topic)`, which ignores late or duplicate events;
+  - notification dedupes in memory.
+- **Arrival order:** a payment event can reach order before `inventory.reserved`. The order then steps
+  `PENDING → INVENTORY_RESERVED → CONFIRMED`.
+- **Cancel reason:** cancelled orders store `cancel_reason` (`OUT_OF_STOCK` | `PAYMENT_DECLINED`), returned by the
+  order API and shown in the storefront.
 
 ### Assistant
 
@@ -86,6 +115,17 @@ Details: `packages/frontend/README.md`.
 - **Configuration:** environment variables with safe local defaults; every variable is listed in `.env.example`.
 - **Logging:** `createLogger(<service>)` (Pino JSON) with `correlationId` on every request log; never log
   secrets, tokens or full chat text.
-- **Identity:** read the user ID only from `x-user-id`; any read of a user-owned record by ID checks ownership.
+- **Identity:** read the user ID only from `x-user-id`, with `requireUserId(req)` from `@ecommerce/shared` (401
+  when absent). Any read of a user-owned record by ID checks ownership and answers a non-owner with the same 404
+  as a missing record. Malformed UUIDs also get 404 (`isUuid`), never a database error.
+- **Ownership across services:** a service that needs to know who owns another service's record asks the owner
+  over HTTP as the user (forwarded `x-user-id`, `x-correlation-id`, `x-internal-token`). Example: payment calls
+  order `GET /orders/:id` before showing a payment (002).
 - **Docs:** each package has a `README.md` learning guide; update it when routes, env vars or behaviour change.
 - **TypeScript:** JSDoc on exported functions and components; match the surrounding code's style.
+- **Tests:** unit tests live next to the code as `src/**/*.test.ts` (`specs/testing-strategy.md`). Each `tsc`-built
+  package has `tsconfig.json` (typecheck, tests included) and `tsconfig.build.json` (build, tests excluded); its
+  `build` script uses the latter. The root `.dockerignore` keeps `*.test.ts` out of images.
+- **Order state machine:** check transitions with `canTransitionOrder(from, to)` from `@ecommerce/shared`, never by
+  reading `VALID_ORDER_TRANSITIONS` inline.
+- **Runtime:** Node 26 everywhere (`node:26-alpine` images, root `engines` `>=26.0.0`; D-009).

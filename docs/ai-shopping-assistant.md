@@ -349,7 +349,7 @@ src/
 ### Implementation notes (decisions made while building Phases 0–2)
 
 - **Internal service token** is opt-in: services enforce `INTERNAL_SERVICE_TOKEN` only when it is set, so local development keeps working. The gateway also now strips client-sent `x-user-*` headers. Host port mappings in `docker-compose.yml` are unchanged; set the token in any shared environment.
-- **Order ownership** is enforced in the assistant (`getOwnOrder`), because `GET /orders/:id` and `GET /payments/:orderId` do not check the owner. Those endpoints should get the same check for browser callers too (follow-up).
+- **Order ownership** is enforced by `GET /orders/:id` and `GET /payments/:orderId` themselves since feature 002 (non-owners get 404). The assistant keeps its own check (`getOwnOrder`) as a second layer.
 - **Tool input validation** uses Zod through `betaZodTool` instead of `strict: true`; invalid inputs come back to the model as tool errors.
 - **`propose_cart_action`** shipped as `propose_add_to_cart` (add only). `addCartItem` in the frontend now accepts a `quantity`.
 - **Conversation size** is capped (`conversation_full`) rather than compacted, to keep history append-only. Compaction can come later.
