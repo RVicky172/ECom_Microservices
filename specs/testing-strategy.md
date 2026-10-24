@@ -33,6 +33,16 @@ as evidence in each feature's tasks.
   (`status` returning itself, `json`) and a `vi.fn()` `next`; assert what reaches `next` and that the service was
   or was not called.
 - **HTTP clients:** `vi.stubGlobal('fetch', vi.fn())` and assert URL, forwarded headers and status mapping.
+- **Model providers (assistant):** stub the SDK, not a server. `vi.mock('@anthropic-ai/sdk')` replaces only the
+  `Anthropic` class; its fake `beta.messages.toolRunner(params)` records `params` and returns a runner that is
+  async-iterable over streams (each async-iterable with `finalMessage()`) and has `done()`. `betaZodTool` comes
+  from another import path and stays real, so the captured `tools[].input_schema` is the real JSON Schema. Assert
+  the request the provider builds (cached `system` block, tool names) and the streamed result
+  (`src/agent/providers/anthropic.test.ts`, D-018).
+- **Kafka producers:** mock `createKafkaClient` / `createProducer` / `publishEvent` from `@ecommerce/shared`
+  (keep the rest with `importOriginal`), and load a fresh module per test (`vi.resetModules()` +
+  `vi.importActual`) when it caches the producer. Test a publish cap with a fake that never resolves and fake
+  timers, not a stopped broker (`src/clients/handoffPublisher.test.ts`).
 - **Ownership:** test owner → record and non-owner → the same 404 as missing (rule 6), and that a non-owner never
   triggers the read of the record itself.
 
@@ -44,8 +54,8 @@ as evidence in each feature's tasks.
    flaky test is a bug: find the race, don't add retries.
 4. **Prove important tests can fail** by briefly breaking the code they cover.
 
-5. **No paid model calls in automated tests.** Assistant tests use a stubbed model server
-   (`ANTHROPIC_BASE_URL` or `ASSISTANT_OPENAI_BASE_URL` pointing at a local stub); live-model checks are manual.
+5. **No paid model calls in automated tests.** Assistant tests stub the model SDK (see "Model providers" above);
+   live-model checks are manual.
 6. **Security behaviour is tested both ways:** a user can reach their own data, and gets 401/404 for someone else's.
 7. **Unit tests don't need the Docker stack.** Anything that needs running services is an integration check.
 

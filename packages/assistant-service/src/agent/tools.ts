@@ -1,5 +1,6 @@
 /**
- * The tools the assistant's model can call. All of them are read-only.
+ * The tools the assistant's model can call. All are read-only except
+ * `request_human_handoff`, which sends one support request per conversation.
  *
  * Every tool is created per request by {@link buildTools} so it can close over
  * the verified {@link RequestContext}. No tool accepts a user ID as input.
@@ -10,7 +11,8 @@ import { z } from 'zod';
 import * as store from '../clients/storeClients';
 import type { RequestContext } from '../context';
 import type { EmitEvent, ProductCard } from './events';
-import { defineTool, ToolFailure, type AssistantTool } from './toolTypes';
+import { buildHandoffTool } from './handoffTool';
+import { defineTool, instrumented, ToolFailure, type AssistantTool } from './toolTypes';
 
 /** How many product cards to show under one answer. */
 const MAX_PRODUCT_CARDS = 6;
@@ -36,30 +38,6 @@ const availability = (stock: store.StockLevel | null): string => {
 
 /** Lower-case words of 2+ characters, used for simple keyword matching. */
 const keywords = (text: string): string[] => text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 1);
-
-/**
- * Wraps a tool body so the UI sees progress ("Checking your orders…") and any
- * failure reaches the model as an `is_error` result it can explain, instead of
- * an exception that aborts the turn.
- */
-const instrumented = <Args>(
-  name: string,
-  emit: EmitEvent,
-  body: (args: Args) => Promise<unknown>,
-): ((args: Args) => Promise<string>) => {
-  return async (args) => {
-    emit({ type: 'tool_status', tool: name, state: 'running' });
-    try {
-      const result = await body(args);
-      emit({ type: 'tool_status', tool: name, state: 'done' });
-      return JSON.stringify(result);
-    } catch (error) {
-      emit({ type: 'tool_status', tool: name, state: 'error' });
-      if (error instanceof ToolFailure) throw error;
-      throw new ToolFailure(`The ${name} lookup failed because a store service is unavailable. Tell the customer to try again shortly.`);
-    }
-  };
-};
 
 /** Creates the tool set for one request. */
 export const buildTools = (ctx: RequestContext, emit: EmitEvent): AssistantTool<any>[] => [
@@ -218,4 +196,6 @@ export const buildTools = (ctx: RequestContext, emit: EmitEvent): AssistantTool<
       };
     }),
   }),
+
+  buildHandoffTool(ctx, emit),
 ];

@@ -16,13 +16,19 @@ const chatBodySchema = z.object({
 });
 
 /** Identity from the gateway's verified JWT. Never from the request body. */
-const contextFrom = (req: Request): RequestContext => {
+const userIdFrom = (req: Request): string => {
   const userId = req.headers['x-user-id'];
   if (typeof userId !== 'string' || !userId) {
     throw new UnauthorizedError('Missing user identity');
   }
-  return { userId, correlationId: req.correlationId ?? randomUUID() };
+  return userId;
 };
+
+const contextFrom = (req: Request, conversationId: string): RequestContext => ({
+  userId: userIdFrom(req),
+  correlationId: req.correlationId ?? randomUUID(),
+  conversationId,
+});
 
 const errorMessages: Record<AssistantErrorCode, string> = {
   not_configured: 'The assistant is not set up on this server yet.',
@@ -43,16 +49,17 @@ export const postChat = async (req: Request, res: Response, next: NextFunction):
   let ctx: RequestContext;
   let body: z.infer<typeof chatBodySchema>;
   try {
-    ctx = contextFrom(req);
+    userIdFrom(req); // a missing identity is a 401 whatever the body holds
     const parsed = chatBodySchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid request');
     body = parsed.data;
+    ctx = contextFrom(req, body.conversationId ?? randomUUID());
   } catch (error) {
     return next(error);
   }
 
   const log: Logger = req.log;
-  const conversationId = body.conversationId ?? randomUUID();
+  const { conversationId } = ctx;
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -116,7 +123,7 @@ export const postChat = async (req: Request, res: Response, next: NextFunction):
 /** GET /api/v1/assistant/conversations/:id — the visible transcript, for restoring the chat after a reload. */
 export const getConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ctx = contextFrom(req);
+    const ctx = contextFrom(req, req.params.id);
     const stored = await conversations.loadConversation(ctx.userId, req.params.id);
     if (!stored || stored.provider !== provider.id) throw new NotFoundError('Conversation');
     res.json({ conversationId: req.params.id, messages: provider.toTranscript(stored.messages) });
@@ -128,7 +135,7 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
 /** DELETE /api/v1/assistant/conversations/:id — the user clears their chat history. */
 export const deleteConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ctx = contextFrom(req);
+    const ctx = contextFrom(req, req.params.id);
     await conversations.deleteConversation(ctx.userId, req.params.id);
     res.status(204).end();
   } catch (error) {

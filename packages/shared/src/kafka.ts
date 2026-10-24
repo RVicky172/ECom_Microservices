@@ -1,11 +1,14 @@
-import { Kafka, logLevel, Producer, Consumer } from 'kafkajs';
+import { Kafka, logLevel, Producer, Consumer, type KafkaConfig, type RetryOptions } from 'kafkajs';
 import { v4 as uuidv4 } from 'uuid';
 import type { EventTypes, KafkaTopics, SagaEnvelope } from './events';
+
+/** Timeouts and retry limits that replace the client defaults (e.g. to bound how long a send may keep trying). */
+export type KafkaLimits = Pick<KafkaConfig, 'connectionTimeout' | 'requestTimeout' | 'retry'>;
 
 /**
  * Creates a KafkaJS client instance.
  */
-export const createKafkaClient = (clientId: string): Kafka => {
+export const createKafkaClient = (clientId: string, limits: KafkaLimits = {}): Kafka => {
   const brokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
   return new Kafka({
     clientId: clientId || process.env.KAFKA_CLIENT_ID || 'ecommerce-platform',
@@ -15,16 +18,23 @@ export const createKafkaClient = (clientId: string): Kafka => {
       initialRetryTime: 300,
       retries: 10,
     },
+    ...limits,
   });
 };
 
 /**
- * Creates a connected Kafka producer with idempotent mode enabled.
+ * Creates a connected Kafka producer, idempotent by default. Without a `retry`
+ * an idempotent producer retries a send without limit.
  */
-export const createProducer = async (kafka: Kafka): Promise<Producer> => {
+export const createProducer = async (
+  kafka: Kafka,
+  options: { idempotent?: boolean; retry?: RetryOptions } = {},
+): Promise<Producer> => {
+  const { idempotent = true, retry } = options;
   const producer = kafka.producer({
-    idempotent: true,
+    idempotent,
     maxInFlightRequests: 1,
+    ...(retry && { retry }),
   });
   await producer.connect();
   return producer;

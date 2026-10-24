@@ -29,6 +29,9 @@ The full design, rollout phases and open questions are in [docs/ai-shopping-assi
 4. In `.env`, set `ASSISTANT_PROVIDER=openai-compatible` and leave `ASSISTANT_MODEL` empty to use the loaded model, or set its API identifier.
 5. Run `docker compose up -d --build assistant-service`. `GET /health` shows the provider and model.
 
+To load Qwen3 30B on a 16 GB GPU without slowing the PC down (context length, parallel slots, avoiding a second
+copy), follow [`docs/lm-studio-setup.md`](../../docs/lm-studio-setup.md).
+
 The container reaches your machine as `host.docker.internal` (see `extra_hosts` in `docker-compose.yml`). If chats fail with a connection error, enable **Serve on Local Network** in LM Studio's server settings. When running the service directly on your machine (`npm run dev:assistant`), use `ASSISTANT_OPENAI_BASE_URL=http://localhost:1234/v1`.
 
 Local models differ from Claude in a few ways the service handles: `<think>…</think>` reasoning is removed from replies and history, tool arguments are validated with the same Zod schemas (invalid calls go back to the model as errors), and a missing tool-call ID is generated. Answers are usually slower and less reliable than Claude's, so check them before relying on them.
@@ -51,7 +54,8 @@ Conversations are stored in the format of the provider that wrote them. After sw
 | `ASSISTANT_MAX_ITERATIONS` | `8` | Maximum model ↔ tool round trips for one message. |
 | `ASSISTANT_USER_MSGS_PER_HOUR` | `30` | Per-user message limit. |
 | `ASSISTANT_MAX_HISTORY_MESSAGES` | `80` | Conversation size cap (see below). |
-| `REDIS_HOST`, `REDIS_PORT` | `localhost:6379` | Conversation storage, turn locks, rate limits. |
+| `REDIS_HOST`, `REDIS_PORT` | `localhost:6379` | Conversation storage, turn locks, rate limits, handoff references. |
+| `KAFKA_BROKERS` | `localhost:9092` | Where handoff events are published. Only a handoff needs Kafka; the chat works without it. |
 | `PRODUCT_SERVICE_URL` … `PAYMENT_SERVICE_URL` | `localhost:4002`–`4006` | Internal services the tools call. |
 | `INTERNAL_SERVICE_TOKEN` | unset | Sent to internal services, and required from the gateway, when set. |
 
@@ -92,7 +96,7 @@ Problems found before the model is called (limits, a turn already running) are a
 
 ## The tools
 
-All tools are read-only and defined once in `src/agent/tools.ts` against a provider-neutral contract (`src/agent/toolTypes.ts`). Each one is a thin wrapper over an existing service endpoint (`src/clients/storeClients.ts`).
+All tools except `request_human_handoff` are read-only. They are defined once in `src/agent/tools.ts` against a provider-neutral contract (`src/agent/toolTypes.ts`). Each one is a thin wrapper over an existing service endpoint (`src/clients/storeClients.ts`).
 
 | Tool | Data source |
 | --- | --- |
@@ -103,12 +107,35 @@ All tools are read-only and defined once in `src/agent/tools.ts` against a provi
 | `list_orders` | Order Service (10 most recent) |
 | `get_order` | Order Service + Payment Service; accepts a full ID or the 8-character reference |
 | `propose_add_to_cart` | Product Service; emits a `proposal` event, adds nothing |
+| `request_human_handoff` | Publishes `assistant.handoff_requested` to Kafka (the one tool that sends something; see below) |
+
+## Store policies
+
+The store's policies (returns, shipping, warranty, payment, cancellation and refunds) live in one file, [`policies/store-policies.md`](policies/store-policies.md). The service reads it at startup and puts it in the system prompt (`src/agent/policies.ts`, `src/agent/systemPrompt.ts`), cached for Claude. The prompt tells the model to answer policy questions only from this document, and when the document doesn't cover something, to say so and offer to connect the customer with a person rather than guess.
+
+- **Changing a policy** needs no code change: edit the file and restart. Under Docker the file is copied into the image, so rebuild: `docker compose up -d --build assistant-service`.
+- **A missing or empty file stops the service** at startup with `Store policy document not readable at …` or `Store policy document is empty: …`, so it never runs without its policies.
+- Keep the terms explicit. Local models read silence literally: "card payments only" was read as "doesn't say" for PayPal until the file said "We don't accept any other payment method" (decision D-020).
+
+## Talking to a person (handoff)
+
+When the customer asks for a person, or says yes after the assistant offered one, the model calls `request_human_handoff` with a reason (`customer_request`, `policy_not_covered`, `order_problem`, `other`) and a short summary. The tool (`src/agent/handoffTool.ts`):
+
+1. Returns the existing reference if this conversation already has one (Redis `assistant:handoff:{userId}:{conversationId}`, kept as long as the conversation), and publishes nothing.
+2. Otherwise creates a reference such as `HO-90A1B81C` and publishes `assistant.handoff_requested` (`src/clients/handoffPublisher.ts`) with the reference, the user ID, the conversation ID, the reason, the summary and the time.
+3. Stores the reference only once Kafka has accepted the event, then the assistant gives the customer the reference.
+
+The Notification Service logs the support email for it ([its guide](../notification-service/README.md)).
+
+If Kafka is unavailable, the publish gives up after one attempt (at most 5 s) and the customer is told support couldn't be reached and to try again later; nothing is stored, so trying again works once Kafka is back, and the rest of the chat keeps working. The single attempt is deliberate: a KafkaJS producer left retrying would deliver the handoff after the customer was told it failed (decision D-021).
+
+**Privacy:** the event carries IDs, the reason category and a summary of at most 500 characters written by the model. No chat transcript and no email address leave the assistant, and the user ID always comes from the gateway, never from the model.
 
 ## How it stays safe
 
 - **Identity comes only from the gateway.** The tools are created per request and close over the verified user ID. No tool takes a user ID as input, so the model can't request another customer's data.
 - **Order ownership is checked here too.** Since feature 002 the Order and Payment services return 404 for someone else's order or payment. `getOwnOrder` still compares `user_id` as a second layer and reports someone else's order as not found. Short references are resolved only against the user's own orders.
-- **The model cannot change anything.** There are no write tools. `propose_add_to_cart` shows a button; the browser adds the item through the normal cart endpoint, with the user's own session, only when they click it.
+- **The model cannot change anything.** There are no write tools; the only thing it can send is a handoff request, and only when the customer asks for it. `propose_add_to_cart` shows a button; the browser adds the item through the normal cart endpoint, with the user's own session, only when they click it.
 - **Tool output is data.** The system prompt tells Claude to treat product text and tool results as data, not instructions. The frontend renders replies as plain text, never HTML.
 - **Cost and abuse limits.** Per-user hourly limit in Redis, a cap on tool round trips, `max_tokens`, low effort by default, and a cached system prompt.
 - **Refusals (Claude).** Requests use server-side fallbacks (`fallbacks: "default"`). If the final answer is still a refusal, the customer sees a neutral message.

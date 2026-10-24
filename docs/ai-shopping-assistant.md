@@ -1,6 +1,6 @@
 # AI shopping assistant: design and delivery plan
 
-Status: **Phases 0–2 built**; tested end to end with a stubbed model, awaiting a live-model check with a real `ANTHROPIC_API_KEY` (Phases 3–4 open) · Owner: frontend + platform · Last updated: 2026-10-23
+Status: **Phases 0–3 built** (Phase 3, policies and handoff, in feature 011); checked live on a local model (LM Studio, Qwen3 30B) and with a stubbed Claude SDK; a live check with a real `ANTHROPIC_API_KEY` is still pending; Phase 4 open · Owner: frontend + platform · Last updated: 2026-10-24
 
 Implementation: [packages/assistant-service](../packages/assistant-service/README.md) · frontend `src/components/assistant/`
 
@@ -203,8 +203,8 @@ user ID as input**, so the model cannot ask for someone else's data.
 | `list_orders` | `GET order:/api/v1/orders` | No | Most recent first, capped at 10. |
 | `get_order` | `GET order:/api/v1/orders/:id` + `GET payment:/api/v1/payments/:orderId` | No | Explains saga states (`PENDING` → `INVENTORY_RESERVED` → `CONFIRMED`, or `CANCELLED` with reason). |
 | `propose_cart_action` | none (returns a proposal to the UI) | **No** | `{ action: "add" \| "remove" \| "set_quantity", productId, quantity }`. The UI renders a confirm button; the browser calls the existing cart API. |
-| `search_help_center` (Phase 3) | policy/FAQ documents | No | See §4.6. |
-| `request_human_handoff` (Phase 3) | publishes `assistant.handoff_requested` to Kafka | Event only | Notification service picks it up. |
+| `search_help_center` (Phase 3) | policy/FAQ documents | No | Not built: the policies fit in the system prompt (§4.6). |
+| `request_human_handoff` (Phase 3) ✅ | publishes `assistant.handoff_requested` to Kafka | Event only | Only when the customer asks or accepts an offer; one per conversation; the notification service logs it. |
 
 Tool-result hygiene:
 
@@ -250,6 +250,8 @@ policies (returns, shipping, warranty):
 
 - **Start simple:** put the policy documents (a few pages) directly in the
   cached system prompt. Cheap thanks to caching and needs no new infrastructure.
+  Built this way in feature 011: one document,
+  `packages/assistant-service/policies/store-policies.md` (about 300 words).
 - **Only if content grows large:** add retrieval (embeddings in MongoDB Atlas
   Vector Search or pgvector) behind the `search_help_center` tool.
 
@@ -341,7 +343,7 @@ src/
 | **0. Foundations** ✅ | Lock down internal ports / service token; scaffold `assistant-service` (health, Dockerfile, compose entry, gateway route); `.env.example` keys. | Service healthy in compose; `/api/v1/assistant/*` returns 401 without a JWT. |
 | **1. Read-only assistant** ✅ (built) | System prompt, `search_products`, `get_product`, `check_stock`, `list_orders`, `get_order`; SSE streaming; Redis history; chat widget. | A signed-in user can discover products and get correct order status; no write path exists. |
 | **2. Cart help** ✅ (built) | `get_cart`, `propose_cart_action`, proposal UI wired to existing cart mutations. | Items are added only after a confirm click; cart and sidebar update immediately. |
-| **3. Policies and handoff** | Policy docs in the cached prompt; `request_human_handoff` → Kafka → notification service. | Policy answers match the source documents; handoff events appear in the notification service logs. |
+| **3. Policies and handoff** ✅ (shipped, feature 011) | Policy docs in the cached prompt; `request_human_handoff` → Kafka → notification service. | Policy answers match the source documents; handoff events appear in the notification service logs. |
 | **4. Hardening** | Per-user limits, feedback, eval suite in CI, cost dashboard from usage logs, model/effort tuning from eval results. | Eval pass rate target met; cost per conversation within budget. |
 
 ---
@@ -355,6 +357,13 @@ src/
 - **Conversation size** is capped (`conversation_full`) rather than compacted, to keep history append-only. Compaction can come later.
 - **Model providers:** `ASSISTANT_PROVIDER` switches between `anthropic` (Claude) and `openai-compatible` (LM Studio, Ollama, vLLM). Tools are written once against a neutral contract; each provider adapts them. Stored conversations are tagged with their provider. This allows development and demos without API credits; quality on local models is lower and should be checked with the Phase 4 evals.
 - **Not yet built:** the `assistant.interaction` Kafka event, feedback buttons, and the eval suite (Phase 4).
+
+### Implementation notes (Phase 3, feature 011)
+
+- **Policy file:** `policies/store-policies.md` in the assistant package, read at startup and placed in the system prompt with rules: answer policy questions only from it, and when it doesn't cover something, say so and offer a person (never invent a yes or no). A missing or empty file stops the service. Editing the file changes answers with no code change; under Docker the file is copied into the image, so rebuild the assistant (`npm run dev` needs only a restart). Measured on Qwen3 30B: 10/10 covered questions and 3/3 uncovered ones answered correctly (D-020).
+- **Handoff:** `request_human_handoff` publishes `assistant.handoff_requested` with a reference (`HO-` + 8 hex characters), the gateway-verified user ID, the conversation ID, a reason (`customer_request`, `policy_not_covered`, `order_problem`, `other`), a summary of at most 500 characters and a timestamp. No transcript leaves the assistant. The reference is kept in Redis (`assistant:handoff:{userId}:{conversationId}`), so a repeat request returns it and publishes nothing.
+- **Kafka down:** the producer connects on the first handoff and makes one attempt capped at 5 s; the customer is told support couldn't be reached and to try again later, and the chat keeps working. The attempt is bounded inside KafkaJS too (no retries, 1 s timeouts), so a failed handoff is never delivered later (D-021).
+- **Where handoffs go (open question 3):** the notification service logs a simulated support email. There is no ticketing tool or admin page yet.
 
 ## 9. Configuration
 
@@ -403,5 +412,5 @@ Each phase is only "done" when these documents are updated in the same change.
 
 1. Budget: what monthly API spend and per-conversation cost are acceptable? This drives the final model and effort choice.
 2. Should signed-out visitors get a limited, product-only assistant? (Needs a separate anonymous rate limit.)
-3. Where do human handoffs go: email, a ticketing tool, or an admin page?
+3. ~~Where do human handoffs go: email, a ticketing tool, or an admin page?~~ Answered in feature 011 (Q2): the notification service logs a simulated support email; a ticketing tool or admin page can come later.
 4. Retention: is 7 days of chat history acceptable, and do we need a user-visible "clear history" in Phase 1?

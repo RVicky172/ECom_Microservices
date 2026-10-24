@@ -3,7 +3,12 @@ import { ValidationError } from './errors';
 import {
   CANCEL_REASONS,
   canTransitionOrder,
+  EventTypes,
+  HANDOFF_REASONS,
+  KafkaTopics,
+  MAX_HANDOFF_SUMMARY,
   OrderStatus,
+  parseHandoffRequested,
   parseInventoryRejected,
   parseInventoryReserved,
   parseOrderCreated,
@@ -145,5 +150,63 @@ describe('saga event payloads', () => {
 
   it('knows exactly two cancel reasons', () => {
     expect([...CANCEL_REASONS].sort()).toEqual(['OUT_OF_STOCK', 'PAYMENT_DECLINED']);
+  });
+});
+
+describe('assistant handoff event (011)', () => {
+  const valid = {
+    reference: 'HO-1A2B3C4D',
+    userId: USER_ID,
+    conversationId: 'b0c5d1a2-0a8e-4a3f-9a57-0d0c2e7b9f11',
+    reason: 'customer_request',
+    summary: 'Customer wants to talk to a person about a late order.',
+    requestedAt: '2026-10-23T12:00:00.000Z',
+  };
+
+  it('has its own topic and event type', () => {
+    expect(KafkaTopics.ASSISTANT_HANDOFF_REQUESTED).toBe('assistant.handoff_requested');
+    expect(EventTypes.HANDOFF_REQUESTED).toBe('HANDOFF_REQUESTED');
+  });
+
+  it('knows exactly four reasons', () => {
+    expect([...HANDOFF_REASONS].sort()).toEqual(['customer_request', 'order_problem', 'other', 'policy_not_covered']);
+  });
+
+  it('accepts a complete payload and returns its fields', () => {
+    expect(parseHandoffRequested(valid)).toEqual(valid);
+  });
+
+  it('returns only the six known fields, dropping anything else (no transcript passes through)', () => {
+    expect(parseHandoffRequested({ ...valid, transcript: [{ role: 'user', text: 'hi' }] })).toEqual(valid);
+  });
+
+  it.each(['reference', 'userId', 'conversationId', 'reason', 'summary', 'requestedAt'])(
+    'rejects a payload without %s, naming the event and the field',
+    (field) => {
+      const { [field]: _dropped, ...incomplete } = valid as Record<string, unknown>;
+      const error = rejectionOf(parseHandoffRequested, incomplete);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.message).toBe(`assistant.handoff_requested: ${field} missing or invalid`);
+    },
+  );
+
+  it.each([
+    ['an unknown reason', { reason: 'angry_customer' }, 'reason'],
+    ['an empty summary', { summary: '  ' }, 'summary'],
+    ['a summary one character over the cap', { summary: 'x'.repeat(501) }, 'summary'],
+  ])('rejects %s', (_case, change, field) => {
+    expect(rejectionOf(parseHandoffRequested, { ...valid, ...change }).message).toBe(
+      `assistant.handoff_requested: ${field} missing or invalid`,
+    );
+  });
+
+  it('accepts a summary of exactly the cap', () => {
+    expect(MAX_HANDOFF_SUMMARY).toBe(500);
+    const summary = 'x'.repeat(500);
+    expect(parseHandoffRequested({ ...valid, summary }).summary).toBe(summary);
+  });
+
+  it('rejects something that is not an object', () => {
+    expect(rejectionOf(parseHandoffRequested, null)).toBeInstanceOf(ValidationError);
   });
 });

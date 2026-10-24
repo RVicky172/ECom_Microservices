@@ -12,6 +12,7 @@ export enum KafkaTopics {
   PAYMENT_COMPLETED = 'payment.completed',
   PAYMENT_FAILED = 'payment.failed',
   ORDER_SHIPPED = 'order.shipped',
+  ASSISTANT_HANDOFF_REQUESTED = 'assistant.handoff_requested',
 }
 
 export enum EventTypes {
@@ -23,6 +24,7 @@ export enum EventTypes {
   ORDER_CONFIRMED = 'ORDER_CONFIRMED',
   ORDER_CANCELLED = 'ORDER_CANCELLED',
   ORDER_SHIPPED = 'ORDER_SHIPPED',
+  HANDOFF_REQUESTED = 'HANDOFF_REQUESTED',
 }
 
 /**
@@ -145,7 +147,16 @@ const reader = (event: string, data: unknown) => {
     if (fields[field] !== expected) throw invalid(field);
     return expected;
   };
-  return { text, amount, items, literal };
+  const oneOf = <T extends string>(field: string, allowed: readonly T[]): T => {
+    if (!allowed.includes(fields[field] as T)) throw invalid(field);
+    return fields[field] as T;
+  };
+  const shortText = (field: string, max: number): string => {
+    const value = text(field);
+    if (value.length > max) throw invalid(field);
+    return value;
+  };
+  return { text, amount, items, literal, oneOf, shortText };
 };
 
 export const parseOrderCreated = (data: unknown): OrderCreatedData => {
@@ -175,5 +186,40 @@ export const parsePaymentFailed = (data: unknown): PaymentFailedData => {
     items: read.items(),
     amount: read.amount('amount'),
     reason: read.literal('reason', 'PAYMENT_DECLINED'),
+  };
+};
+
+/**
+ * A customer asked the shopping assistant for a person (feature 011). Published by
+ * the assistant, logged by notification as a support email. Carries IDs, a reason
+ * and a short summary, never the chat transcript or an email address.
+ */
+export const HANDOFF_REASONS = ['customer_request', 'policy_not_covered', 'order_problem', 'other'] as const;
+export type HandoffReason = (typeof HANDOFF_REASONS)[number];
+export const MAX_HANDOFF_SUMMARY = 500;
+
+export interface HandoffRequestedData {
+  /** Shown to the customer, e.g. "HO-1A2B3C4D"; one per conversation. */
+  reference: string;
+  /** From the gateway-verified identity, never from the model or the customer. */
+  userId: string;
+  conversationId: string;
+  reason: HandoffReason;
+  /** Written by the assistant, 1–500 characters. */
+  summary: string;
+  /** ISO timestamp. */
+  requestedAt: string;
+}
+
+/** Returns only the known fields, so nothing else (e.g. a transcript) passes through. */
+export const parseHandoffRequested = (data: unknown): HandoffRequestedData => {
+  const read = reader('assistant.handoff_requested', data);
+  return {
+    reference: read.text('reference'),
+    userId: read.text('userId'),
+    conversationId: read.text('conversationId'),
+    reason: read.oneOf('reason', HANDOFF_REASONS),
+    summary: read.shortText('summary', MAX_HANDOFF_SUMMARY),
+    requestedAt: read.text('requestedAt'),
   };
 };
