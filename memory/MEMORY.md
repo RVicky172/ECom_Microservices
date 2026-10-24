@@ -10,7 +10,7 @@
   policies 10/10 + 3/3 on Qwen3, first-ask handoff 4/4, product answers grounded 7/7, Kafka-down safe (D-021).
   Phase 1: 010 ✔️, 011 ✔️; 012 🚧.
 - **Next step:** `/spec-implement 012` from T001 (LM Studio usage spike) and T002 (direct-call spike). Load LM Studio per
-  `docs/lm-studio-setup.md` before live eval runs. 011 changes are not committed yet.
+  `docs/lm-studio-setup.md` before live eval runs. 011 is in PR #1; 012 work is on branch `feat/012-assistant-evals-feedback`.
 - **Testing:** `npm test` (Vitest, `packages/*/src/**/*.test.ts`, 237 tests); `npm run check` runs it. Node 26
   everywhere (D-009).
 - **Tracking:** status lives in `specs/roadmap.json` + `feature.json` too; keep in sync (D-005). View: `npm run dashboard`.
