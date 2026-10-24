@@ -66,6 +66,7 @@ loudly (feature 010; G3/G4 closed).
 | `inventory.rejected` | inventory | order | `orderId, reason: 'OUT_OF_STOCK'` |
 | `payment.completed` | payment | order, inventory, notification | `orderId, items, amount` |
 | `payment.failed` | payment | order, inventory, notification | `orderId, items, amount, reason: 'PAYMENT_DECLINED'` |
+| `assistant.handoff_requested` | assistant | notification | `reference, userId, conversationId, reason: 'customer_request' \| 'policy_not_covered' \| 'order_problem' \| 'other', summary (≤ 500 chars), requestedAt` (feature 011; not part of the saga, keyed by the reference) |
 
 Rules:
 

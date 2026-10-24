@@ -47,7 +47,9 @@ The event uses the standard envelope and the shared `publishEvent` (010).
      nothing (Q5).
   2. **New request:** create reference `HO-` + 8 uppercase hex characters, and publish
      `assistant.handoff_requested` with `userId`/`conversationId` from the context.
-  3. **Publishing is capped at 5 s.** On failure or timeout, throw
+  3. **Publishing is capped at 5 s.** KafkaJS makes one attempt (non-idempotent producer, no retries, 1 s
+     connection and request timeouts) that ends inside the cap, so a failed publish is never delivered later
+     (added 2026-10-24, D-021). On failure or timeout, throw
      `ToolFailure('Support could not be reached right now…')`: the model tells the customer to try later, and
      nothing is stored, so a later try can succeed (AC-8).
   4. **Record it:** on success, store the reference with the conversation's TTL (7 days), then return
@@ -193,6 +195,9 @@ export const saveHandoffReference: (userId: string, conversationId: string, refe
   token (as the gateway itself does).
 - **Kafka producer retries can stall a turn** (KafkaJS retries for tens of seconds). Mitigation: the 5 s cap on
   publishing (§3), tested with a never-resolving fake.
+- **A capped publish can still land later** (found 2026-10-24 in T034: an idempotent KafkaJS producer retries
+  without limit, so the event reached support ~50 s after the customer was told it failed). Mitigation: one
+  bounded KafkaJS attempt inside the cap (D-021), unit-tested and re-measured live.
 - **Policy text makes every request longer.** About 300 words; cached for Claude; for the local model it adds a
   little latency per turn. Accepted (design doc §4.6).
 - **Prompt changes can shift behaviour of the existing tools** (cart, orders). Mitigation: T032's live run also asks

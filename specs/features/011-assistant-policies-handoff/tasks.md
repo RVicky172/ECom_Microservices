@@ -277,7 +277,7 @@ anything surprising or deferred. Keep `feature.json` in step (same ids, same don
       packaging." Restored the file (byte-identical copy), rebuilt, asked again → "…within 30 days of delivery…".
       Note: the document is copied into the image, so under Docker a change needs a rebuild, not just a restart
       (with `npm run dev` a restart is enough). To be said in the assistant README (T090).
-- [ ] **T034** — Handoff runs:
+- [x] **T034** — Handoff runs:
       - "I'd like to talk to a person about my order": reference in the reply; exactly 1 message on the topic
         (`kafka-console-consumer.sh`), with no transcript; the notification log line has the same reference, with
         the time difference recorded (≤ 5 s);
@@ -287,10 +287,64 @@ anything surprising or deferred. Keep `feature.json` in step (same ids, same don
         is still answered; then start Kafka.
 
       · test: recorded output (AC-4–AC-9)
+      **Result (2026-10-24):** LM Studio `qwen/qwen3-30b-a3b-2507` (reloaded with `-c 16384 --parallel 1`: turns
+      went from ~115 s to 0.5–6 s; `docs/lm-studio-setup.md`). Topic `assistant.handoff_requested` at offset 0.
+      - Request (user A): the first ask, "I'd like to talk to a person about my order", got "Could you provide the
+        order reference…?" and no handoff; the follow-up "No, I want to talk to a person, please." →
+        `request_human_handoff` done, reply "Your request has been sent to a person… HO-90A1B81C". Offset 0 → 1.
+        Payload: reference, userId, conversationId, `customer_request`, a 54-character summary, `requestedAt`; no
+        transcript. Notification log: same reference, user and conversation, **45 ms** after `requestedAt`.
+      - Repeat in the same conversation → "the reference is HO-90A1B81C", offset still 1, 1 notification.
+      - Replay (console producer, same key/headers/value) → offset 2, "Event already processed, skipping",
+        still 1 notification.
+      - Kafka stopped (user B): honest "couldn't connect you with a person right now. Please try again later"
+        (10.1 s), the next question answered (2.3 s). **But the event was delivered ~50 s after Kafka came back**
+        (offset 3, support notified): the idempotent producer retried without limit. Fixed by D-021 (one bounded
+        KafkaJS attempt; 3 unit tests, 2 break checks caught; 235 tests). Re-run after the fix (user C): Kafka
+        stopped → failure reply, turn 4.0 s; Kafka paused → failure reply, 4.6 s; after 90 s offset still 3, 0
+        new notifications; a retry in the paused conversation once Kafka was back → HO-2FBAD601, offset 4,
+        notified 1.8 s after sending. Every `/health` 200, consumers `running`.
+      - Open (AC-4, model behaviour): 2 of 4 first asks ("…about my order", "I want to talk to a person, please.")
+        got a clarifying question instead of a handoff; the 2 asks that named a reason handed off at once. A
+        prompt rule is proposed; it needs the user's call (and a T032 re-run).
+
+- [x] **T035** — Hand off on the first ask (added 2026-10-24, user's call after T034: 2 of 4 first requests for a
+      person got a clarifying question). Prompt rule: when the customer asks for a person, call the tool in that
+      turn; don't ask what it's about first (the summary can say the reason wasn't given). Test first in
+      `systemPrompt.test.ts`; then live: the 4 T034 first asks in new conversations, and a full T032 re-run (15
+      questions + 2 regression) with 0 handoff events · files: `systemPrompt.ts`, `systemPrompt.test.ts` · test: unit
+      + recorded output (AC-2, AC-3, AC-4)
+      **Progress (2026-10-24, not done):** 4 prompt attempts, each test-first (prompt test fails, then passes).
+      First asks handed off in the same turn: attempt 1 2/4 · attempt 2 3/4 ("…about my order" got "I'll connect
+      you… please wait" with no tool call) · attempt 3 2/4, and one reply **made up** the sample reference
+      `HO-1A2B3C4D` from the prompt with no handoff · attempt 4 (no sample reference, "never make up a
+      reference", a different example phrase so "…about my order" stays held out) **4/4**, each with a real
+      reference, offset 12 → 16. T032 re-run on attempt 4: P1–P10 10/10, U1–U3 3/3, 0 handoff events. **But product
+      grounding regressed:** "Do you have any wireless mice?" invented three branded mice with no tool call; with
+      the committed prompt it calls `search_products` ("Mouse: $25.00"). "Do you have a keyboard?" skips the tool
+      under both prompts (an existing gap). Needs the user's call. Raw output: `t035-*.txt` in the session
+      scratchpad. (A first misreading, that replies lacked the reference, was a `grep '^reply'` that showed only
+      each reply's first line; the raw SSE had it.)
+      Attempt 5 (user chose option 1: handoff rule scoped to requests for a person; new grounding rule "before
+      naming any product, call search_products or get_product; never name a product, brand or price a tool did not
+      return"): handoffs **4/4** first ask (offset 16 → 20); P1–P10 **9/10** (P7 back to "don't cover payment
+      methods beyond card… I don't know if PayPal is accepted", no contradiction); U1–U3 3/3; 0 unasked handoffs in
+      18 other questions; R1, R2, mice, monitors grounded with tools. **Still failing:** "Do you have a keyboard?"
+      invents three branded keyboards with no tool call (committed prompt: a vague "we have several keyboards",
+      also with no tool call). Raw: `t035-a5-*.txt`.
+      **Result (2026-10-24), attempt 6** (user's choice; adds a vague-question example, "Do you have headphones?" →
+      `search_products` first, with "keyboard" held out): first-ask handoffs **4/4** in the same turn with real
+      references (offset 20 → 24); product questions **7/7** looked up first (keyboard ×2 → the $75 keyboard, mice
+      $25, monitors $300, laptops $1,200, mechanical keyboard under $100, webcams → "couldn't find any"); after the
+      06:00 rate-limit reset P1–P10 **10/10**, U1–U3 **3/3**, R2 via `list_orders`, **0 unasked handoffs** (offset
+      24 → 24). Rules added (D-022): handoff straight away, scoped to requests for a person; never claim connecting
+      without a tool result; reply with the tool's reference word for word, no sample reference in the prompt;
+      catalog lookup before naming any product. Prompt tests: 2 tests, each failed first; break checks (sample
+      reference back, grounding rule removed) caught. 237 tests. Raw: `t035-a6-part1.txt`, `t035-a6-part2.txt`.
 
 ## Verify
 
-- [ ] **T090** — Docs (AC-13):
+- [x] **T090** — Docs (AC-13):
       - `docs/ai-shopping-assistant.md`: Phase 3 shipped; open question 3 answered; implementation note on the
         policy file and handoff;
       - assistant README: policies, the handoff tool, privacy;
@@ -300,10 +354,26 @@ anything surprising or deferred. Keep `feature.json` in step (same ids, same don
       - `specs/testing-strategy.md`: the provider stub pattern.
 
       · test: review
-- [ ] **T091** — Every Definition-of-Done gate green (`specs/constitution.md`): `npm run check`, `npm run build`,
+      **Result (2026-10-24):** design doc: status Phases 0–3 built, Phase 3 ✅ in §8, tool table (handoff built,
+      `search_help_center` not needed), §4.6 points at the policy file, Phase 3 implementation notes (policy file,
+      handoff payload, Kafka-down behaviour, D-021), open question 3 answered. Assistant README: "Store policies"
+      (edit → rebuild under Docker, missing file stops startup, D-020 lesson), "Talking to a person" (steps,
+      Kafka down, privacy), handoff tool row, `KAFKA_BROKERS` row. Notification README: topic list and "Support
+      handoffs" with a real log line. Shared README: handoff parser, producer limits. `architecture.md`: event
+      table row. `README.md`: handoff flow under Event Flow and the assistant → Kafka arrow in the diagram.
+      `testing-strategy.md`: SDK stub and Kafka producer patterns; rule 5 corrected (it described a stub server
+      we don't use). Also new: `docs/lm-studio-setup.md`, linked from the assistant README. `npm run check` 13/13.
+- [x] **T091** — Every Definition-of-Done gate green (`specs/constitution.md`): `npm run check`, `npm run build`,
       every `/health`; record the numbers
-- [ ] **T092** — Tick ACs in `spec.md` (Status `Implemented`), update `roadmap.md`/`roadmap.json`,
+      **Result (2026-10-24):** `npm run check` 13/13 (235 tests); `npm run build` exit 0 in 14 s; `docker compose
+      up -d --build --wait` (all images, since `shared` changed) in 35 s; `/health` 200 on :4000–:4008 and the
+      storefront on :3000; consumers `running` on order, inventory, payment and notification; 0 "Failed to start"
+      in the logs. Gates 1 and 4 (ACs ticked, memory and roadmap) are T092.
+- [x] **T092** — Tick ACs in `spec.md` (Status `Implemented`), update `roadmap.md`/`roadmap.json`,
       `memory/progress.md`, `memory/MEMORY.md`
+      **Result (2026-10-24):** 13/13 ACs ticked in `spec.md` and `feature.json` (status `implemented`, stage
+      `verified`); spec Status `Implemented` with Changelog entries for D-021, T035 and sign-off; roadmap 011 ✔️
+      (`roadmap.md`, `roadmap.json`); progress and MEMORY updated. `npm run check` 13/13, 237 tests.
 
 ## AC coverage
 
@@ -312,7 +382,7 @@ anything surprising or deferred. Keep `feature.json` in step (same ids, same don
 | AC-1  | T002, T010, T021, T030, T033   |
 | AC-2  | T002, T032                     |
 | AC-3  | T002, T032                     |
-| AC-4  | T012, T022, T032, T034         |
+| AC-4  | T012, T022, T032, T034, T035   |
 | AC-5  | T014, T023, T034               |
 | AC-6  | T012, T014, T022, T023, T034   |
 | AC-7  | T012, T022                     |

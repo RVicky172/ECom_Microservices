@@ -94,4 +94,18 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   works in Vitest but fails the packages' nodenext typecheck (TS2835, needs `.js`) (011 T013).
 - `Promise.race([work, timeout])` subscribes to `work`, so if the timeout wins, a later rejection of `work` is
   already handled; no extra `.catch()` is needed to avoid an unhandled rejection (011 T022, checked by a test).
+- ...but the race only stops *waiting*: a KafkaJS `send` that lost the race keeps retrying and can still land.
+  An idempotent KafkaJS producer with no `retry` option retries without limit (`Number.MAX_SAFE_INTEGER`; it
+  refuses `retries: 0`). 011 T034 (2026-10-24): the "failed" handoff reached support ~50 s after Kafka came back.
+  Fix (D-021): non-idempotent producer, `retries: 0`, 1 s connection/request timeouts.
+- LM Studio on the dev machine (RTX 5080, 16 GB): `lms load` defaults (51,968-token context, 4 parallel slots)
+  push part of the 18.6 GB Qwen3 30B model off the GPU, so turns took ~115 s; a JIT-loaded second copy (`…:2`)
+  makes the whole PC lag. Load it as in `docs/lm-studio-setup.md` (16k context, 1 slot) → 0.5–6 s per turn.
 
+- Prompt examples get copied literally by Qwen3 30B: a sample handoff reference (`HO-1A2B3C4D`) in the system
+  prompt appeared in a reply with no handoff behind it (011 T035). Use placeholders, never realistic sample IDs. An
+  imperative "call the tool straight away, before writing anything" for handoffs made it skip `search_products`
+  and invent branded products; scoping the rule to handoffs plus an explicit "look up before naming any product"
+  rule with a vague-question example fixed it (D-022). Re-check product grounding after any prompt change.
+- Measuring chat replies: `chat.mjs` prints a multi-line reply; filtering its output with `grep '^reply'` shows
+  only the first line and hides text written after a tool call (cost a false "reference missing" in T035).

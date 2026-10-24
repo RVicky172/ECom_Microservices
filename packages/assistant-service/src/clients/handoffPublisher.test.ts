@@ -44,7 +44,17 @@ describe('publishHandoff', () => {
     expect(publish.mock.calls).toEqual([
       [producer, KafkaTopics.ASSISTANT_HANDOFF_REQUESTED, EventTypes.HANDOFF_REQUESTED, data.reference, data, 'corr-1'],
     ]);
-    expect(createKafkaClient).toHaveBeenCalledWith('assistant-service-producer');
+    expect(vi.mocked(createKafkaClient).mock.calls[0][0]).toBe('assistant-service-producer');
+  });
+
+  it('makes KafkaJS give up on its own inside the 5 s cap, so a timed-out handoff is never delivered later', async () => {
+    const publishHandoff = await load();
+    await publishHandoff(data, 'corr-1');
+    const limits = vi.mocked(createKafkaClient).mock.calls[0][1]!;
+    expect(limits.retry).toEqual({ retries: 0 }); // one connection attempt
+    expect(connect).toHaveBeenCalledWith({ kafka: true }, { idempotent: false, retry: { retries: 0 } }); // one send attempt
+    // One attempt = connect + metadata request + produce request.
+    expect(limits.connectionTimeout! + 2 * limits.requestTimeout!).toBeLessThan(5000);
   });
 
   it('connects the producer once, on first use', async () => {

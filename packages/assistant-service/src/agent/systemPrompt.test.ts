@@ -35,6 +35,30 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/same reference/i);
   });
 
+  it('hands off in the same turn the customer asks, without asking what it is about first (T035)', () => {
+    expect(prompt).toMatch(/only for requests to talk to a person: call request_human_handoff straight away, before writing anything/i);
+    expect(prompt).toMatch(/don't ask what it's about first/i);
+    expect(prompt).toMatch(/never say you are connecting them .* unless the tool/i);
+    expect(prompt).toMatch(/after the tool result, always reply with the reference/i);
+    // "…a person about my order" kept getting "Could you give me the order reference?" (T034, T035). The example
+    // is a different phrase on purpose, so the live check on the original one stays a fair test.
+    expect(prompt).toMatch(/"I want to speak to someone about my refund".*call request_human_handoff/i);
+    expect(prompt).not.toContain('about my order');
+    // A sample reference in the prompt was copied into a reply with no handoff behind it (T035 attempt 3).
+    expect(prompt).not.toMatch(/HO-[0-9A-F]{8}/);
+    expect(prompt).toMatch(/never make up a reference/i);
+  });
+
+  it('makes product answers come from a catalog lookup, never from memory (T035)', () => {
+    // The handoff rule made Qwen3 answer "Do you have any wireless mice?" with invented brands and no tool call.
+    expect(prompt).toMatch(/before naming, recommending or describing any product, call search_products or get_product/i);
+    expect(prompt).toMatch(/never name a product, brand or price that a tool did not return/i);
+    // A vague question ("Do you have a keyboard?") got invented brands. The example uses another product on purpose,
+    // so the live check on the keyboard question stays a fair test.
+    expect(prompt).toMatch(/"Do you have headphones\?".*call search_products/i);
+    expect(prompt).not.toMatch(/do you have a keyboard/i);
+  });
+
   it('keeps the existing instructions', () => {
     expect(prompt).toMatch(/^You are the shopping assistant for mercato/);
     expect(prompt).toContain('Never invent products, prices, specifications, policies or delivery dates.');

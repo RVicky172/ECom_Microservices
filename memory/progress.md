@@ -11,6 +11,28 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-24 — 011: assistant policies + handoff, implement and sign-off (T034, T035, T090–T092; 22 of 22 tasks)
+
+**Done:**
+- LM Studio was off and then loaded with defaults (52k context, 4 slots): turns ~115 s, a second JIT copy. Reloaded
+  with `-c 16384 --parallel 1` → 0.5–6 s; written up in `docs/lm-studio-setup.md`.
+- T034 live handoff: notified 45 ms after the request; repeat and replay → still 1 notification; no transcript.
+  Kafka stopped: honest reply, but the event landed ~50 s after Kafka returned (idempotent KafkaJS producer retries
+  forever). Fixed with one bounded attempt (D-021, option A chosen by RVicky172): shared Kafka helpers take
+  optional limits; 3 new tests, 2 break checks. Re-run: failure turns 4.0 s / 4.6 s (stopped / paused), 0 late
+  deliveries in 90 s, a retry after recovery succeeded. 235 tests.
+- T090 docs (design doc Phase 3 shipped, assistant/notification/shared READMEs, architecture event row, README
+  handoff flow, testing patterns). T091: check 13/13, build ok, all images rebuilt, every `/health` 200.
+
+- T035 (added on RVicky172's call): hand off on the first ask. 6 prompt attempts; faults found on the way: a
+  "connecting you" claim with no tool call, a sample reference copied into a reply, invented branded products.
+  Attempt 6 (D-022): first-ask handoffs 4/4, products 7/7 looked up, P1–P10 10/10, U1–U3 3/3, 0 unasked handoffs.
+  237 tests.
+- T092: 13/13 ACs, spec Implemented, roadmap 011 ✔️.
+
+**Next:** commit 011 (on request); then `/spec-new` 012 (assistant evals), keeping T035's cases.
+**Blockers:** none.
+
 ## 2026-10-23 — 011: assistant policies + handoff, implement (T001–T033 done, 16 of 21 tasks)
 
 **Done:**

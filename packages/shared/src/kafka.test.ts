@@ -1,10 +1,55 @@
-import type { Kafka, Producer } from 'kafkajs';
+import { Kafka, type Producer } from 'kafkajs';
 import { describe, expect, it, vi } from 'vitest';
 import { EventTypes, KafkaTopics } from './events';
-import { ensureTopics, publishEvent, startSagaConsumer } from './kafka';
+import { createKafkaClient, createProducer, ensureTopics, publishEvent, startSagaConsumer } from './kafka';
+
+vi.mock('kafkajs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('kafkajs')>()),
+  Kafka: vi.fn(),
+}));
 
 const ORDER_ID = '4eb595bd-36de-4eb6-9ef7-f8da2b9cfe16';
 const silentLogger = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
+
+describe('createKafkaClient', () => {
+  it('keeps the saga defaults when no limits are given', () => {
+    vi.mocked(Kafka).mockClear();
+    createKafkaClient('svc');
+    expect(vi.mocked(Kafka).mock.calls[0][0]).toMatchObject({ clientId: 'svc', retry: { initialRetryTime: 300, retries: 10 } });
+  });
+
+  it('applies the given timeouts and retry limits', () => {
+    vi.mocked(Kafka).mockClear();
+    createKafkaClient('svc', { connectionTimeout: 1000, requestTimeout: 1000, retry: { retries: 0 } });
+    expect(vi.mocked(Kafka).mock.calls[0][0]).toMatchObject({
+      clientId: 'svc',
+      connectionTimeout: 1000,
+      requestTimeout: 1000,
+      retry: { retries: 0 },
+    });
+  });
+});
+
+describe('createProducer', () => {
+  const fakeClient = () => {
+    const connect = vi.fn(async () => {});
+    const producer = vi.fn(() => ({ connect }));
+    return { kafka: { producer } as unknown as Kafka, producer, connect };
+  };
+
+  it('creates an idempotent producer by default and connects it', async () => {
+    const { kafka, producer, connect } = fakeClient();
+    await createProducer(kafka);
+    expect(producer).toHaveBeenCalledWith({ idempotent: true, maxInFlightRequests: 1 });
+    expect(connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes idempotence and retry overrides to KafkaJS', async () => {
+    const { kafka, producer } = fakeClient();
+    await createProducer(kafka, { idempotent: false, retry: { retries: 0 } });
+    expect(producer).toHaveBeenCalledWith({ idempotent: false, maxInFlightRequests: 1, retry: { retries: 0 } });
+  });
+});
 
 describe('publishEvent', () => {
   const send = vi.fn();
