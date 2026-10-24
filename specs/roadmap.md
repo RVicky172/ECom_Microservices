@@ -18,12 +18,13 @@ _Goal:_ what exists is recorded, the repo has a real test harness, and known sec
 | 001 | Test harness: Vitest across packages, wired into `npm test` and `npm run check`, first unit tests | [spec](features/001-test-harness/spec.md) | ✔️ |
 | 002 | Ownership checks on `GET /orders/:id` and `GET /payments/:orderId` (users see only their own data) | [spec](features/002-ownership-checks/spec.md) | ✔️ |
 | 004 | Spec dashboard: local Next.js app showing roadmap, feature progress and memory, live | [spec](features/004-spec-dashboard/spec.md) | ✔️ |
+| 005 | Dependency upgrades to latest stable, Dependabot, JSDoc on every file and export, coding standards | [spec](features/005-dependency-upgrades-code-standards/spec.md) | 📝 |
 
 **Exit criteria:** on a clean clone, `npm ci && npm run check && npm test && npm run build` pass, and a user
 cannot read another user's order or payment. (CI was dropped from this phase on 2026-10-23 and moved to the
 backlog, D-012.)
 
-**Status:** ✔️ Phase 0 complete (2026-10-23): 000, 001, 002 and 004 done.
+**Status:** ✔️ Phase 0 exit criteria met (2026-10-23): 000, 001, 002 and 004 done. 005 (maintenance) added 2026-10-24, 📝 drafted.
 
 ## Phase 1 — Checkout & Assistant
 
@@ -50,7 +51,7 @@ steps, and the assistant eval suite passes its agreed target on the configured m
 - `order.shipped`: nothing produces it and notification has no handler (000 G9).
 - Durable idempotency for the order and notification Kafka consumers (000 G10).
 - Fresh clones start unprotected: generate `INTERNAL_SERVICE_TOKEN` in setup or refuse to start without it (000 G11).
-- Shared emits no type declarations: services see `@ecommerce/shared` as untyped and need it built before typecheck (found in 001).
+- Services type-check against the built `packages/shared/dist` (type declarations since 2026-10-24, D-029), so shared must be built before their typecheck (found in 001; matters for CI).
 - CI: GitHub Actions running check, test and build on every push and pull request (was Phase 0 feature 003; moved to backlog 2026-10-23, D-012). Needs Node 26 and `shared` built before the service typecheck.
 - Persist Kafka data: the `kafka_data` volume is commented out in `docker-compose.yml`, so recreating Kafka wipes topics and consumer offsets (found in 010; 010 makes the saga robust to it).
 - Gateway rate limiter is mounted before `/health`, so a busy client (or scripted tests) makes the gateway's health check return 429 (found in 010 verify).
