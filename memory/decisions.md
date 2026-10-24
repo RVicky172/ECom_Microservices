@@ -243,3 +243,59 @@ the 5–7 business days start when the returned item is received (new term). Re-
 **Consequences:** P10's expected facts gain the start point; the edit also exercises AC-1 (document change, no
 code change).
 
+
+## D-021 — 011 T034: the handoff producer makes one bounded attempt (2026-10-24)
+
+**Context:** live run with Kafka stopped: the publish hit the 5 s cap and the customer was told the request was not
+sent, yet the event reached support ~50 s after Kafka came back. KafkaJS gives an idempotent producer unlimited
+retries by default; `Promise.race` only stops waiting, so the send kept retrying.
+**Decision (RVicky172, option A):** the handoff producer is non-idempotent with `retries: 0` on client and
+producer, `connectionTimeout` and `requestTimeout` 1 s: one attempt ends within ~3 s, inside the cap. Shared
+`createKafkaClient`/`createProducer` take optional limits (saga producers unchanged). Duplicates are already
+dropped by the notification service's event-ID check (AC-6).
+**Alternatives:** B: keep retries, say "couldn't confirm" and store the reference (spec change); disconnect the
+producer on timeout (no guarantee a pending retry stops).
+**Consequences:** a transient broker error fails the handoff at once ("try again later") instead of retrying; a
+retry in the same conversation works because nothing is stored on failure. Measured: failure turns 4.0 s
+(stopped) / 4.6 s (paused), 0 late deliveries in 90 s.
+
+## D-022 — 011 T035: hand off on the first ask, and ground product answers explicitly (2026-10-24)
+
+**Context:** T034 showed Qwen3 30B asking "what is it about?" on 2 of 4 first requests for a person (AC-4 wants the
+handoff in that turn). Prompt attempts 1–4 traded that for new faults: a reply claiming "I'll connect you" with no
+tool call, a sample reference copied into a reply with no handoff, and invented branded products for product
+questions.
+**Decision (RVicky172):** add the handoff rule, scoped to requests for a person; never claim connecting or sent
+without a tool result; reply with the tool's reference word for word (no sample reference in the prompt); and a
+grounding rule in "How to work": call `search_products`/`get_product` before naming any product, with a
+vague-question example ("Do you have headphones?"). Examples use different phrases from the live checks.
+**Alternatives:** accept AC-4 at 2/4; a code-level guard that retries an ungrounded reply (new scope).
+**Consequences:** attempt 6 measured 4/4 first-ask handoffs, 7/7 grounded product answers, 10/10 + 3/3 policies, 0
+unasked handoffs. Still prompt-based on one local model: the 012 evals should keep these cases.
+
+## D-023 — 012 spec approved with all proposed answers (2026-10-24)
+
+**Context:** 012 (assistant eval suite, answer feedback, usage analytics; design doc Phase 4, first half) was drafted
+with 12 open questions.
+**Decision (RVicky172):** accept Q1–Q12 as proposed: one feature, evals built first; 50 rule-graded cases (no LLM
+judge), one reply per case per run; target ≥ 90% overall and 100% in safety categories on 2 consecutive runs on
+LM Studio Qwen3 30B; eval data created through the normal APIs; implicit "no handoff" rule on non-handoff cases;
+feedback up/down only; analytics events carry no user ID and no text; a CLI usage report (tokens, no currency); a
+per-user daily token budget goes to the backlog.
+**Alternatives:** split feedback and analytics into 013; an LLM-as-judge grader.
+**Consequences:** Phase 1 exit depends on AC-5; eval runs are manual (CI is in the backlog).
+
+## D-024 — 012 plan decisions, all as recommended (2026-10-24)
+
+**Context:** the 012 plan listed six decision points.
+**Decision (RVicky172):** (1) the eval runner calls assistant-service and the other services directly on their host
+ports with identity headers and `INTERNAL_SERVICE_TOKEN`, not through the gateway (100 req / 15 min per IP); fresh
+per-run eval users, ≤ 25 messages each, keep the 30/hour assistant limit unchanged. (2) Eval rules check tool names
+only; AC-3 narrowed (spec Changelog). (3) SSE `done` gains `answerId` and `usage`; a new `handoff` SSE event is
+emitted after Kafka acknowledges, and the eval grades handoffs with it. (4) The usage report runs inside the
+assistant container (`docker compose exec`), since Kafka advertises only `kafka:9092`. (5) The injection case
+creates and deletes a temporary product through the (still unprotected) product write routes. (6) Eval reports are
+git-ignored; AC-5 summaries go in tasks.md.
+**Alternatives:** gateway calls with a raised limit; tool inputs in SSE; a host Kafka listener; committed reports.
+**Consequences:** ~5 leftover eval users per run in `auth_db`; the injection fixture needs an admin token once
+product writes are protected (backlog).

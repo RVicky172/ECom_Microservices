@@ -2,14 +2,16 @@
 
 > Read this first every session. Keep ≤ 40 lines. Rules: `specs/memory-management.md`.
 
-## Current State (2026-10-23)
+## Current State (2026-10-24)
 
 - **Phase:** 1 (Checkout & Assistant). Phase 0 complete 2026-10-23 (CI moved to backlog, D-012). SDD since 2026-10-23 (D-001).
-- **Active feature:** 011 assistant policies + handoff — 🚧 In Progress since 2026-10-23; spec (D-016), plan (D-017);
-  T001–T033 done (16 of 21): code complete, policies measured 10/10 + 3/3 on Qwen3 (D-018–D-020).
-  Phase 0 done; Phase 1: 010 done ✔️ (checkout completes end to end).
-- **Next step:** `/spec-implement 011` → T034 live handoff runs (incl. Kafka stopped), then T090–T092.
-- **Testing:** `npm test` (Vitest, `packages/*/src/**/*.test.ts`, 228 tests); `npm run check` runs it. Node 26
+- **Active feature:** 012 assistant evals + feedback + analytics — 🚧 In Progress 2026-10-24 (spec D-023, plan D-024); tasks.md 0/30
+  (`specs/features/012-assistant-evals-feedback/`). 011 assistant policies + handoff ✔️ Implemented 2026-10-24 (13/13 ACs; D-016–D-022):
+  policies 10/10 + 3/3 on Qwen3, first-ask handoff 4/4, product answers grounded 7/7, Kafka-down safe (D-021).
+  Phase 1: 010 ✔️, 011 ✔️; 012 🚧.
+- **Next step:** `/spec-implement 012` from T001 (LM Studio usage spike) and T002 (direct-call spike). Load LM Studio per
+  `docs/lm-studio-setup.md` before live eval runs. 011 changes are not committed yet.
+- **Testing:** `npm test` (Vitest, `packages/*/src/**/*.test.ts`, 237 tests); `npm run check` runs it. Node 26
   everywhere (D-009).
 - **Tracking:** status lives in `specs/roadmap.json` + `feature.json` too; keep in sync (D-005). View: `npm run dashboard`.
 - **Blockers:** none
