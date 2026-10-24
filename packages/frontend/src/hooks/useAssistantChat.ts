@@ -8,8 +8,8 @@
  * restores the conversation; the history itself lives on the server.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { deleteConversation, fetchConversation, streamAssistantChat } from '../api/assistantApi';
-import type { AssistantEvent, ChatItem } from '../types/assistant';
+import { deleteConversation, fetchConversation, rateAnswer, streamAssistantChat } from '../api/assistantApi';
+import type { AnswerRating, AssistantEvent, AssistantTranscript, ChatItem } from '../types/assistant';
 
 /** Status line shown while a tool runs. */
 const TOOL_ACTIVITY: Record<string, string> = {
@@ -53,7 +53,7 @@ const newItem = (role: ChatItem['role'], text = ''): ChatItem => ({
 });
 
 /** Fold one stream event into the assistant bubble it belongs to. */
-const applyEvent = (item: ChatItem, event: AssistantEvent): ChatItem => {
+export const applyEvent = (item: ChatItem, event: AssistantEvent): ChatItem => {
   switch (event.type) {
     case 'text':
       return { ...item, text: item.text + event.delta };
@@ -67,10 +67,32 @@ const applyEvent = (item: ChatItem, event: AssistantEvent): ChatItem => {
       return { ...item, proposals: [...item.proposals, event.proposal] };
     case 'error':
       return { ...item, activity: undefined, error: { code: event.code, message: event.message } };
+    case 'done':
+      // A finished answer can be rated; an error message never can (012).
+      return item.error ? item : { ...item, answerId: event.answerId };
     default:
       return item;
   }
 };
+
+/** Sets (or clears) one item's rating; other items keep their identity. */
+export const withRating = (items: ChatItem[], itemId: string, rating: AnswerRating | undefined): ChatItem[] =>
+  items.map((item) => (item.id === itemId ? { ...item, rating } : item));
+
+/** Undoes a rating that failed to save, unless a newer vote has replaced it meanwhile. */
+export const revertRating = (
+  items: ChatItem[],
+  itemId: string,
+  failed: AnswerRating,
+  previous: AnswerRating | undefined,
+): ChatItem[] => items.map((item) => (item.id === itemId && item.rating === failed ? { ...item, rating: previous } : item));
+
+/** Panel items from a stored transcript, with answer IDs and saved ratings (012). */
+export const itemsFromTranscript = ({ messages, ratings = {} }: AssistantTranscript): ChatItem[] =>
+  messages.map((message) => ({
+    ...newItem(message.role, message.text),
+    ...(message.answerId ? { answerId: message.answerId, rating: ratings[message.answerId] } : {}),
+  }));
 
 /**
  * @param userId The signed-in user; scopes the remembered conversation id.
@@ -89,8 +111,8 @@ export const useAssistantChat = (userId: string) => {
     let cancelled = false;
     setIsRestoring(true);
     fetchConversation(id)
-      .then((messages) => {
-        if (!cancelled) setItems(messages.map((message) => newItem(message.role, message.text)));
+      .then((transcript) => {
+        if (!cancelled) setItems(itemsFromTranscript(transcript));
       })
       .catch(() => {
         // Expired or deleted: start fresh.
@@ -165,5 +187,17 @@ export const useAssistantChat = (userId: string) => {
     if (previous) void deleteConversation(previous).catch(() => undefined);
   }, [userId]);
 
-  return { items, isStreaming, isRestoring, send, stop, newChat };
+  /** Rate a finished answer. Shown at once; put back if the server doesn't save it (012). */
+  const rate = useCallback(async (item: ChatItem, rating: AnswerRating): Promise<void> => {
+    const id = conversationId.current;
+    if (!item.answerId || !id || item.rating === rating) return;
+    setItems((current) => withRating(current, item.id, rating));
+    try {
+      await rateAnswer(id, item.answerId, rating);
+    } catch {
+      setItems((current) => revertRating(current, item.id, rating, item.rating));
+    }
+  }, []);
+
+  return { items, isStreaming, isRestoring, send, stop, newChat, rate };
 };

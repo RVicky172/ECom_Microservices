@@ -42,3 +42,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Assistant eval run reports (012; summaries go in the feature tasks.md)
+packages/assistant-service/eval-reports/

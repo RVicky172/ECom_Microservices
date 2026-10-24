@@ -35,7 +35,10 @@ export const buildHandoffTool = (ctx: RequestContext, emit: EmitEvent) =>
     }),
     run: instrumented('request_human_handoff', emit, async ({ reason, summary }) => {
       const existing = await getHandoffReference(ctx.userId, ctx.conversationId);
-      if (existing) return { already_requested: true, reference: existing };
+      if (existing) {
+        emit({ type: 'handoff', reference: existing, alreadyRequested: true });
+        return { already_requested: true, reference: existing };
+      }
 
       const data: HandoffRequestedData = {
         reference: newReference(),
@@ -54,6 +57,8 @@ export const buildHandoffTool = (ctx: RequestContext, emit: EmitEvent) =>
       }
       // The request is out; if saving the reference fails, a repeat request may send a second one.
       await saveHandoffReference(ctx.userId, ctx.conversationId, data.reference).catch(() => undefined);
+      // Only now, after Kafka acknowledged: the eval grades handoffs by this event (012).
+      emit({ type: 'handoff', reference: data.reference, alreadyRequested: false });
       return { handoff_requested: true, reference: data.reference };
     }),
   });

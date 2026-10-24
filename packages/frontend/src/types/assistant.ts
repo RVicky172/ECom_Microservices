@@ -34,7 +34,16 @@ export type AssistantEvent =
   | { type: 'tool_status'; tool: string; state: 'running' | 'done' | 'error' }
   | { type: 'products'; items: AssistantProductCard[] }
   | { type: 'proposal'; proposal: CartProposal }
-  | { type: 'done'; conversationId: string; stopReason: string | null }
+  /** Support was told; used by the eval, ignored by the chat UI (012). */
+  | { type: 'handoff'; reference: string; alreadyRequested: boolean }
+  | {
+      type: 'done';
+      conversationId: string;
+      stopReason: string | null;
+      /** Identifies this answer for feedback (012). */
+      answerId: string;
+      usage: { inputTokens: number; cachedInputTokens: number; outputTokens: number } | null;
+    }
   | { type: 'error'; code: AssistantErrorCode; message: string };
 
 /** One bubble in the chat panel. */
@@ -47,4 +56,17 @@ export interface ChatItem {
   /** What the assistant is doing right now, e.g. "Checking your orders…". */
   activity?: string;
   error?: { code: AssistantErrorCode | 'network'; message: string };
+  /** Set when the answer finished (from `done`); only then can it be rated (012). */
+  answerId?: string;
+  rating?: AnswerRating;
+}
+
+/** Thumbs up or down on one assistant answer (012). */
+export type AnswerRating = 'up' | 'down';
+
+/** `GET /api/v1/assistant/conversations/:id`: the visible transcript and its saved ratings. */
+export interface AssistantTranscript {
+  messages: Array<{ role: 'user' | 'assistant'; text: string; answerId?: string }>;
+  /** Missing on servers from before 012. */
+  ratings?: Record<string, AnswerRating>;
 }

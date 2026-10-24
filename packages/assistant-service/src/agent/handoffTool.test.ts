@@ -59,11 +59,32 @@ describe('request_human_handoff', () => {
     expect(saveReference.mock.calls).toEqual([[ctx.userId, ctx.conversationId, reference]]);
   });
 
-  it('shows progress in the chat', async () => {
+  it('shows progress in the chat, with the handoff event between running and done (012)', async () => {
     await tool.run(input);
+    const { reference } = published();
     expect(emit.mock.calls).toEqual([
       [{ type: 'tool_status', tool: 'request_human_handoff', state: 'running' }],
+      [{ type: 'handoff', reference, alreadyRequested: false }],
       [{ type: 'tool_status', tool: 'request_human_handoff', state: 'done' }],
+    ]);
+  });
+
+  it('emits the handoff event only after the publish has resolved (012)', async () => {
+    let acknowledge!: () => void;
+    publish.mockReturnValue(new Promise<void>((resolve) => (acknowledge = resolve)));
+    const running = tool.run(input);
+    await vi.waitFor(() => expect(publish).toHaveBeenCalledOnce());
+    expect(emit.mock.calls.some(([event]) => event.type === 'handoff')).toBe(false);
+    acknowledge();
+    await running;
+    expect(emit.mock.calls.filter(([event]) => event.type === 'handoff')).toHaveLength(1);
+  });
+
+  it('emits alreadyRequested: true with the stored reference on a repeat request (012)', async () => {
+    getReference.mockResolvedValue('HO-0000BEEF');
+    await tool.run(input);
+    expect(emit.mock.calls.filter(([event]) => event.type === 'handoff')).toEqual([
+      [{ type: 'handoff', reference: 'HO-0000BEEF', alreadyRequested: true }],
     ]);
   });
 
@@ -85,6 +106,7 @@ describe('request_human_handoff', () => {
     expect(failure).toBeInstanceOf(ToolFailure);
     expect((failure as ToolFailure).message).toMatch(/could not be reached/i);
     expect(saveReference).not.toHaveBeenCalled();
+    expect(emit.mock.calls.some(([event]) => event.type === 'handoff')).toBe(false); // 012: no handoff claimed
   });
 
   it('publishes the context user even when the model sends a user ID', async () => {
