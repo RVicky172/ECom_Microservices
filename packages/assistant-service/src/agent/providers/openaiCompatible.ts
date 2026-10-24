@@ -8,6 +8,7 @@
  *
  * The model must support tool calling (e.g. Qwen3, Llama 3.1+, Mistral Small).
  */
+import type { TokenUsage } from '@ecommerce/shared';
 import OpenAI from 'openai';
 import type {
   ChatCompletionMessageFunctionToolCall,
@@ -18,7 +19,7 @@ import { z } from 'zod';
 import { config } from '../../config';
 import { SYSTEM_PROMPT } from '../systemPrompt';
 import { ToolFailure, type AssistantTool } from '../toolTypes';
-import { pushTranscriptEntry, type AssistantProvider, type TranscriptEntry, type TurnInput, type TurnOutput } from './types';
+import { addUsage, pushTranscriptEntry, type AssistantProvider, type TranscriptEntry, type TurnInput, type TurnOutput } from './types';
 
 let client: OpenAI | undefined;
 let resolvedModel: string | undefined;
@@ -136,6 +137,7 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
 
   let hasWrittenText = false;
   let stopReason: string | null = null;
+  let usage: TokenUsage | null = null;
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     const stream = await getClient().chat.completions.create(
@@ -146,6 +148,8 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
         tool_choice: 'auto',
         temperature: config.openai.temperature,
         stream: true,
+        // Adds one last chunk with `usage` and `choices: []` (LM Studio included, 012 T001).
+        stream_options: { include_usage: true },
       },
       { signal },
     );
@@ -170,6 +174,15 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
     const calls = new Map<number, { id: string; name: string; arguments: string }>();
     let finishReason: string | null = null;
     for await (const chunk of stream) {
+      // Read before the `choice` check: the usage chunk has no choices.
+      if (chunk.usage) {
+        const cached = chunk.usage.prompt_tokens_details?.cached_tokens ?? 0;
+        usage = addUsage(usage, {
+          inputTokens: chunk.usage.prompt_tokens - cached,
+          cachedInputTokens: cached,
+          outputTokens: chunk.usage.completion_tokens,
+        });
+      }
       const choice = chunk.choices[0];
       if (!choice) continue;
       if (choice.delta?.content) write(filter.push(choice.delta.content));
@@ -217,7 +230,7 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
     emit({ type: 'text', delta: "Sorry, I didn't get an answer together. Could you rephrase that?" });
   }
 
-  return { messages, stopReason };
+  return { messages, stopReason, model, usage };
 };
 
 const toTranscript = (messages: unknown[]): TranscriptEntry[] => {

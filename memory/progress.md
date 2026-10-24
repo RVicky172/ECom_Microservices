@@ -11,6 +11,26 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-24 — 012: spikes T001, T002; shared analytics events T010, T020; provider usage T011, T021; observer T012, T022; handoff event T013, T023; publishers T014, T024; controller T015, T025; eval core T016, T026; usage report T017, T028; feedback UI T018, T029; chore D-029
+
+**Done:** T001: LM Studio sends usage only with `include_usage`, as a last chunk with `choices: []`, no cached
+count; `TokenUsage` mapping for both providers (D-025). T002: every fixture call works directly from the host
+(paths `/api/v1/<service>`, eval emails `@example.com` since Joi rejects `.test`, product delete is soft); plan
+§3.3 updated. T010/T020: `assistant.interaction` and `assistant.feedback` topics, payloads and parsers in shared,
+41 tests, 8 break checks. T011/T021: both providers return `model` and per-turn summed `usage` (LM Studio via
+`include_usage`), 7 tests, 6 break checks. T012/T022: `TurnObserver` (tools, outcome; repeat handoff = `handoff`, D-026) and
+`buildInteractionEvent` (exact keys, parser contract), 21 tests, 8 break checks. T013/T023: handoff tool emits a `handoff` SSE event after the publish (`done`
+fields moved to T025). T014/T024: one capped producer (`eventPublisher.ts`), fire-and-forget analytics
+publisher (never rejects, one warn, no retry), 13 tests, 8 break checks. T015/T025: answer IDs, `done.usage`, interaction publish, transcript ratings, feedback
+route, 23 tests, 12 break checks; live smoke ok; the first event per new Kafka topic was dropped, fixed by creating the analytics topics at
+startup (D-027). T016/T026: SSE parser, rule grader (term matching D-028), report; 54 tests, 22 break
+checks; the cases test moves to T027. T017/T028: usage aggregation (15 tests, 10 break checks) and the
+`npm run assistant:usage` CLI (live, ends by itself). T018/T029: feedback buttons and reducer (10 tests, 6 break checks). Chore D-029:
+shared emits `.d.ts`; shared and gateway on `@types/express` 4 (21 type errors fixed). Drafted 005 (upgrades,
+Dependabot, JSDoc, coding standards). Gate: check 13/13, 426 tests.
+**Next:** 005 open questions (user), then 005; 012 continues with T027 (cases, user review), T030–T035.
+**Blockers:** none
+
 ## 2026-10-24 — 011: assistant policies + handoff, implement and sign-off (T034, T035, T090–T092; 22 of 22 tasks)
 
 **Done:**

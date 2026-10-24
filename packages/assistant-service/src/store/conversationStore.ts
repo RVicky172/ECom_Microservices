@@ -19,6 +19,11 @@ import { redis } from './redis';
 export interface StoredConversation {
   provider: ProviderId;
   messages: unknown[];
+  /**
+   * Entry k is the answer ID of turn k (012), for feedback. `null` for turns saved
+   * before 012; absent on conversations saved before 012.
+   */
+  answerIds?: Array<string | null>;
 }
 
 const conversationKey = (userId: string, conversationId: string) => `assistant:conv:${userId}:${conversationId}`;

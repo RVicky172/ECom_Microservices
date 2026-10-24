@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { ValidationError } from './errors';
 import {
+  ANSWER_RATINGS,
   CANCEL_REASONS,
   canTransitionOrder,
   EventTypes,
   HANDOFF_REASONS,
+  INTERACTION_OUTCOMES,
   KafkaTopics,
   MAX_HANDOFF_SUMMARY,
   OrderStatus,
+  parseAssistantFeedback,
+  parseAssistantInteraction,
   parseHandoffRequested,
   parseInventoryRejected,
   parseInventoryReserved,
@@ -208,5 +212,130 @@ describe('assistant handoff event (011)', () => {
 
   it('rejects something that is not an object', () => {
     expect(rejectionOf(parseHandoffRequested, null)).toBeInstanceOf(ValidationError);
+  });
+});
+
+describe('assistant analytics events (012)', () => {
+  const CONVERSATION_ID = 'b0c5d1a2-0a8e-4a3f-9a57-0d0c2e7b9f11';
+  const ANSWER_ID = '3f2c9e1a-7b4d-4c8e-9a1f-2d6b5e8c0a47';
+
+  const interaction = {
+    conversationId: CONVERSATION_ID,
+    answerId: ANSWER_ID,
+    provider: 'openai-compatible',
+    model: 'qwen/qwen3-30b-a3b-2507',
+    stopReason: 'end_turn',
+    outcome: 'proposal',
+    tools: ['search_products', 'propose_add_to_cart'],
+    latencyMs: 4721,
+    usage: { inputTokens: 1857, cachedInputTokens: 0, outputTokens: 96 },
+    completedAt: '2026-10-24T12:00:00.000Z',
+  };
+  const feedback = {
+    conversationId: CONVERSATION_ID,
+    answerId: ANSWER_ID,
+    rating: 'down',
+    ratedAt: '2026-10-24T12:01:00.000Z',
+  };
+
+  it('has its own topics and event types', () => {
+    expect(KafkaTopics.ASSISTANT_INTERACTION).toBe('assistant.interaction');
+    expect(KafkaTopics.ASSISTANT_FEEDBACK).toBe('assistant.feedback');
+    expect(EventTypes.INTERACTION_COMPLETED).toBe('INTERACTION_COMPLETED');
+    expect(EventTypes.ANSWER_RATED).toBe('ANSWER_RATED');
+  });
+
+  it('knows exactly six outcomes and two ratings', () => {
+    expect([...INTERACTION_OUTCOMES]).toEqual(['answered', 'proposal', 'handoff', 'refused', 'error', 'limited']);
+    expect([...ANSWER_RATINGS]).toEqual(['up', 'down']);
+  });
+
+  describe('assistant.interaction', () => {
+    const message = (field: string) => `assistant.interaction: ${field} missing or invalid`;
+
+    it('accepts a complete payload and returns its fields', () => {
+      expect(parseAssistantInteraction(interaction)).toEqual(interaction);
+    });
+
+    it('accepts usage: null (the provider reported none), a null stop reason and no tools', () => {
+      const quiet = { ...interaction, usage: null, stopReason: null, tools: [] };
+      expect(parseAssistantInteraction(quiet)).toEqual(quiet);
+    });
+
+    it('returns only the known fields (no user ID or text passes through)', () => {
+      expect(parseAssistantInteraction({ ...interaction, userId: USER_ID, text: 'hi' })).toEqual(interaction);
+    });
+
+    it.each([
+      'conversationId',
+      'answerId',
+      'provider',
+      'model',
+      'stopReason',
+      'outcome',
+      'tools',
+      'latencyMs',
+      'usage',
+      'completedAt',
+    ])('rejects a payload without %s, naming the event and the field', (field) => {
+      const { [field]: _dropped, ...incomplete } = interaction as Record<string, unknown>;
+      const error = rejectionOf(parseAssistantInteraction, incomplete);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.message).toBe(message(field));
+    });
+
+    it.each([
+      ['an unknown outcome', { outcome: 'great' }, 'outcome'],
+      ['a conversation ID that is not a UUID', { conversationId: 'abc' }, 'conversationId'],
+      ['an answer ID that is not a UUID', { answerId: 'answer-1' }, 'answerId'],
+      ['a negative latency', { latencyMs: -1 }, 'latencyMs'],
+      ['a fractional latency', { latencyMs: 1.5 }, 'latencyMs'],
+      ['a tool name that is not a string', { tools: ['search_products', 7] }, 'tools'],
+      ['tools that are not a list', { tools: 'search_products' }, 'tools'],
+      ['a non-ISO timestamp', { completedAt: '24/10/2026 12:00' }, 'completedAt'],
+      ['an impossible ISO date', { completedAt: '2026-13-45T12:00:00.000Z' }, 'completedAt'],
+      ['a 30 February that Date.parse rolls over', { completedAt: '2026-02-30T12:00:00.000Z' }, 'completedAt'],
+      ['a timestamp with an offset instead of Z', { completedAt: '2026-10-24T12:00:00.000+02:00' }, 'completedAt'],
+      ['a timestamp that is a number', { completedAt: 1792825044000 }, 'completedAt'],
+      ['a negative input token count', { usage: { ...interaction.usage, inputTokens: -3 } }, 'usage.inputTokens'],
+      ['a fractional cached token count', { usage: { ...interaction.usage, cachedInputTokens: 0.5 } }, 'usage.cachedInputTokens'],
+      ['a missing output token count', { usage: { inputTokens: 1, cachedInputTokens: 0 } }, 'usage.outputTokens'],
+      ['usage that is not an object', { usage: 12 }, 'usage'],
+    ])('rejects %s', (_case, change, field) => {
+      expect(rejectionOf(parseAssistantInteraction, { ...interaction, ...change }).message).toBe(message(field));
+    });
+
+    it('rejects something that is not an object', () => {
+      expect(rejectionOf(parseAssistantInteraction, null)).toBeInstanceOf(ValidationError);
+    });
+  });
+
+  describe('assistant.feedback', () => {
+    const message = (field: string) => `assistant.feedback: ${field} missing or invalid`;
+
+    it('accepts a complete payload and returns its fields', () => {
+      expect(parseAssistantFeedback(feedback)).toEqual(feedback);
+      expect(parseAssistantFeedback({ ...feedback, rating: 'up' }).rating).toBe('up');
+    });
+
+    it('returns only the known fields (no user ID or comment passes through)', () => {
+      expect(parseAssistantFeedback({ ...feedback, userId: USER_ID, comment: 'bad' })).toEqual(feedback);
+    });
+
+    it.each(['conversationId', 'answerId', 'rating', 'ratedAt'])(
+      'rejects a payload without %s, naming the event and the field',
+      (field) => {
+        const { [field]: _dropped, ...incomplete } = feedback as Record<string, unknown>;
+        expect(rejectionOf(parseAssistantFeedback, incomplete).message).toBe(message(field));
+      },
+    );
+
+    it.each([
+      ['an unknown rating', { rating: 'meh' }, 'rating'],
+      ['a non-ISO timestamp', { ratedAt: 'yesterday' }, 'ratedAt'],
+      ['an answer ID that is not a UUID', { answerId: '42' }, 'answerId'],
+    ])('rejects %s', (_case, change, field) => {
+      expect(rejectionOf(parseAssistantFeedback, { ...feedback, ...change }).message).toBe(message(field));
+    });
   });
 });

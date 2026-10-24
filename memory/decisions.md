@@ -299,3 +299,65 @@ git-ignored; AC-5 summaries go in tasks.md.
 **Alternatives:** gateway calls with a raised limit; tool inputs in SSE; a host Kafka listener; committed reports.
 **Consequences:** ~5 leftover eval users per run in `auth_db`; the injection fixture needs an admin token once
 product writes are protected (backlog).
+
+## D-025 — `TokenUsage` means the same for both providers (2026-10-24)
+
+**Context:** 012 T001: LM Studio's streamed usage chunk has `prompt_tokens` and `completion_tokens` and no cached
+count; OpenAI counts cached tokens inside `prompt_tokens`, Anthropic counts cache reads apart from `input_tokens`.
+**Decision:** `cachedInputTokens` = cache reads (`cache_read_input_tokens` / `prompt_tokens_details.cached_tokens`,
+0 when the field is absent); `inputTokens` = the rest of the prompt (Anthropic `input_tokens +
+cache_creation_input_tokens`; OpenAI-compatible `prompt_tokens − cached`); `outputTokens` = output. No usage chunk
+at all → `usage: null`, never zeros.
+**Alternatives:** pass each provider's raw numbers through; report `null` for cached on LM Studio.
+**Consequences:** input + cached is the whole prompt on both, so reports compare across providers. On LM Studio
+`cachedInputTokens` is always 0 because it doesn't report its prompt cache.
+
+## D-026 — A repeat handoff request is a `handoff` turn (2026-10-24)
+
+**Context:** 012 T022: the `TurnObserver` derives each turn's outcome; a `handoff` SSE event has
+`alreadyRequested: true` when the customer asks again in the same conversation (no new support request).
+**Decision:** any `handoff` event makes the outcome `handoff`, new or repeat. The precedence is error / limited, then
+`refused` > `handoff` > `proposal` > `answered`, as in plan §1.
+**Alternatives:** count only new requests as `handoff` (a repeat would be `answered`).
+**Consequences:** the usage report's "handoffs" counts turns about a handoff, not support requests sent; one
+conversation can count more than one. Support requests sent = `assistant.handoff_requested` events.
+
+## D-027 — The assistant creates its analytics topics at startup (2026-10-24)
+
+**Context:** 012 T025 live smoke: nothing consumes `assistant.interaction` / `assistant.feedback`, so no
+`startSagaConsumer` creates them. Kafka auto-creates a topic on the first producer request, but the single-attempt
+producer (D-021) fails before the new partition has a leader, so the first event per topic was dropped after every
+Kafka recreate (Kafka data isn't persisted, backlog).
+**Decision (RVicky172):** `assistant-service` calls the shared `ensureTopics` for both topics at startup, in the
+background, retrying with the saga consumers' backoff (1 s doubling to 30 s) until Kafka answers
+(`clients/analyticsTopics.ts`). The producer stays single-attempt.
+**Alternatives:** ensure a topic on its first publish (inside the 5 s cap, so a cold start can still drop it);
+accept and document the loss.
+**Consequences:** startup and chat never wait for Kafka; analytics events published before the topics exist (Kafka
+down at startup) are still dropped with one warning each.
+
+## D-028 — How eval text rules match terms (2026-10-24)
+
+**Context:** 012 T026: plan §3.2 says text rules are case-insensitive with Unicode quotes and dashes normalised, so
+"30 days" matches "30-day". Writing the grader showed that plain substring matching also lets "card" match
+"cardboard" and "30 days" match "130 days", and that a strict match fails "we have keyboards" for "keyboard".
+**Decision:** reply and term are normalised (lowercase, whitespace collapsed, `*` `_` backticks removed, curly
+quotes straight, every dash a hyphen). Each term word must match a whole word (no letter or digit on either side);
+a plural "s" is optional; a term word of 4+ letters ending in one "s" also matches without it; a space and a hyphen
+between words are the same. `handoff: none` checks every turn; all other rules check the last turn.
+**Alternatives:** substring matching; regular expressions in the case file.
+**Consequences:** case terms are written as plain words ("30 days", "receipt"); other inflections ("refunded" for
+"refund") must be listed as separate `containsAny` terms.
+
+## D-029 — Shared emits type declarations; every package on Express 4 types (2026-10-24, chore)
+
+**Context:** `declaration: true` was added to `packages/shared/tsconfig.build.json` (RVicky172, during 012). Shared
+had no `@types/express`, so its `.d.ts` resolved `express` from the root `node_modules`, where api-gateway's
+`@types/express` 5.0.6 was hoisted; all other services use 4.17.25. Result: 21 type errors in 7 services
+(`app.use(<shared middleware>)`, v4 `Request` passed to shared helpers typed with v5).
+**Decision (RVicky172: fix as a chore):** keep the declarations; add `@types/express ^4.17.25` as a shared dev
+dependency and move api-gateway's `@types/express` from ^5.0.6 to ^4.17.25, matching the tech stack (Express 4) and
+the gateway's own runtime (`express ^4.21`). No new library.
+**Alternatives:** revert `declaration: true`; Express 5 types everywhere (the runtime is Express 4).
+**Consequences:** services now type-check against real shared types (before: `any`), so producer/consumer drift
+shows at compile time; 012's code passed unchanged. Services still need shared built before their typecheck.

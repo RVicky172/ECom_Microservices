@@ -16,6 +16,7 @@
     "dev:payment": "npm run dev --workspace=packages/payment-service",
     "dev:notification": "npm run dev --workspace=packages/notification-service",
     "dev:assistant": "npm run dev --workspace=packages/assistant-service",
+    "assistant:usage": "docker compose exec assistant-service node packages/assistant-service/dist/analytics/usageReport.js",
     "dev:frontend": "npm run dev --workspace=packages/frontend",
     "check": "node scripts/check.mjs",
     "dashboard": "node tools/spec-dashboard/scripts/start.mjs",
