@@ -1,0 +1,39 @@
+{
+  "id": "005",
+  "folder": "005-dependency-upgrades-code-standards",
+  "title": "Dependency Upgrades, Dependabot, JSDoc and Clean-Code Rules",
+  "phase": 0,
+  "status": "draft",
+  "stage": "spec",
+  "created": "2026-10-24",
+  "updated": "2026-10-24",
+  "summary": "Upgrade every npm package to its latest stable version with the store's behaviour unchanged, set up Dependabot for version and security updates, document every source file and export with JSDoc (checked by npm run check), and write coding standards with the design patterns this repo uses.",
+  "acceptanceCriteria": [
+    { "id": "AC-1", "text": "npm outdated (root, workspaces, spec dashboard) shows nothing behind latest stable, except agreed and listed exceptions.", "test": "manual measurement", "done": false },
+    { "id": "AC-2", "text": "Deprecated @types/ioredis and @types/uuid removed; no library installed in two majors.", "test": "manual measurement", "done": false },
+    { "id": "AC-3", "text": "npm run check and npm run build pass; unit tests ≥ 426; tests changed for an upgrade listed with reasons.", "test": "unit + manual measurement", "done": false },
+    { "id": "AC-4", "text": "Every service image rebuilds from clean; 10/10 health checks healthy.", "test": "manual measurement", "done": false },
+    { "id": "AC-5", "text": "End to end as before: pre-upgrade user signs in, register, products, cart, order CONFIRMED/CANCELLED, assistant turn and rating.", "test": "manual measurement", "done": false },
+    { "id": "AC-6", "text": "Gateway protections unchanged: 401 without JWT, 429 on the 101st request in 15 min, timeout and circuit breaker open and recover.", "test": "manual measurement", "done": false },
+    { "id": "AC-7", "text": "Storefront builds with new React, router and Vite; all 6 pages load with no console errors.", "test": "manual measurement", "done": false },
+    { "id": "AC-8", "text": ".github/dependabot.yml covers npm (root, spec dashboard) and Docker, weekly, grouped minor/patch, majors separate; GitHub shows no config errors.", "test": "manual measurement", "done": false },
+    { "id": "AC-9", "text": "Docs describe reviewing a Dependabot PR locally without CI.", "test": "manual review", "done": false },
+    { "id": "AC-10", "text": "Every non-test source file has a header comment and every export a JSDoc block (today 87/124 files and 151/317 exports lack them; after: 0 and 0).", "test": "manual measurement", "done": false },
+    { "id": "AC-11", "text": "npm run check fails on a missing header or export JSDoc, naming file and line; the checker is unit-tested.", "test": "unit", "done": false },
+    { "id": "AC-12", "text": "Coding-standards doc with patterns and clean-code rules, each with a repo example; referenced by the constitution (version bump), CLAUDE.md and the workflow.", "test": "manual review", "done": false },
+    { "id": "AC-13", "text": "Records updated: tech-stack versions, one decision per major upgrade (D-029 superseded), learnings, roadmap backlog.", "test": "manual review", "done": false }
+  ],
+  "tasks": [],
+  "openQuestions": [
+    { "id": "Q1", "text": "Number and phase: 005 in Phase 0?", "resolved": false },
+    { "id": "Q2", "text": "When relative to 012: finish 012 first, or pause it and do 005 first?", "resolved": false },
+    { "id": "Q3", "text": "Every major to latest with no exceptions except unsupported-on-Node-26/CommonJS ones?", "resolved": false },
+    { "id": "Q4", "text": "Replace ESM-only uuid 14 with crypto.randomUUID?", "resolved": false },
+    { "id": "Q5", "text": "Dependabot settings: weekly, npm + Docker, grouped minor/patch, majors separate, 5 PRs max.", "resolved": false },
+    { "id": "Q6", "text": "Where the Dependabot PR review checklist lives (workflow.md, linked from README).", "resolved": false },
+    { "id": "Q7", "text": "Upgrade in five green steps (tooling, backend libs, Express 5 + gateway, frontend, dashboard)?", "resolved": false },
+    { "id": "Q8", "text": "No ESLint/Prettier in 005; an in-house JSDoc check instead; ESLint to the backlog?", "resolved": false },
+    { "id": "Q9", "text": "Coding rules in specs/coding-standards.md (constitution 1.1.0) and which patterns and rules.", "resolved": false },
+    { "id": "Q10", "text": "Include tools/spec-dashboard?", "resolved": false }
+  ]
+}
