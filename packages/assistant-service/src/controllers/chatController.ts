@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { ANSWER_RATINGS, UnauthorizedError, ValidationError, NotFoundError } from '@ecommerce/shared';
 import type { AssistantErrorCode, AssistantEvent } from '../agent/events';
 import type { TurnOutput } from '../agent/providers/types';
+import { handoffCorrection } from '../agent/handoffGuard';
 import { isConfigured, provider, runAgentTurn } from '../agent/runAgent';
 import { TurnObserver } from '../agent/turnObserver';
 import { buildInteractionEvent } from '../analytics/interactionEvent';
@@ -107,7 +108,10 @@ export const postChat = async (req: Request, res: Response, next: NextFunction):
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
+  // The reply text, for the handoff-claim guard only (never logged or published).
+  let replyText = '';
   const emit = observer.wrap((event: AssistantEvent): void => {
+    if (event.type === 'text') replyText += event.delta;
     if (!res.writableEnded) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
   });
   const fail = (code: AssistantErrorCode): void => {
@@ -147,7 +151,15 @@ export const postChat = async (req: Request, res: Response, next: NextFunction):
       signal: abort.signal,
       log,
     });
-    await conversations.saveConversation(ctx.userId, conversationId, { provider: provider.id, messages: turn.messages, answerIds });
+    // "I'll connect you" without the handoff tool contacts nobody, so correct it (D-048).
+    const correction = handoffCorrection(replyText, observer.tools);
+    let messages = turn.messages;
+    if (correction) {
+      emit({ type: 'text', delta: correction });
+      messages = provider.appendReply(messages, correction);
+      log.warn({ conversationId }, 'handoff claimed without the tool; correction added');
+    }
+    await conversations.saveConversation(ctx.userId, conversationId, { provider: provider.id, messages, answerIds });
     emit({ type: 'done', conversationId, stopReason: turn.stopReason, answerId, usage: turn.usage });
     res.end();
     publishTurn(turn);

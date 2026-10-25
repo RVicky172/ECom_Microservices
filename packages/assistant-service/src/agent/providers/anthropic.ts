@@ -128,6 +128,17 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
   return { messages: closeDanglingToolUse([...runner.params.messages]), stopReason: final.stop_reason, model, usage };
 };
 
+/** Adds a text block to the last assistant message, or adds an assistant message when the last one is the user's. */
+const appendReply = (messages: unknown[], text: string): unknown[] => {
+  const last = messages.at(-1) as BetaMessageParam | undefined;
+  const block: BetaTextBlockParam = { type: 'text', text };
+  if (last?.role === 'assistant') {
+    const content = typeof last.content === 'string' ? [{ type: 'text' as const, text: last.content }] : last.content;
+    return [...messages.slice(0, -1), { ...last, content: [...content, block] }];
+  }
+  return [...messages, { role: 'assistant', content: [block] }];
+};
+
 const toTranscript = (messages: unknown[]): TranscriptEntry[] => {
   const entries: TranscriptEntry[] = [];
   for (const message of messages as BetaMessageParam[]) {
@@ -151,4 +162,5 @@ export const anthropicProvider: AssistantProvider = {
   isConfigured: () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN),
   runTurn,
   toTranscript,
+  appendReply,
 };

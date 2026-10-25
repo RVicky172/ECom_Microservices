@@ -34,10 +34,14 @@ _Goal:_ checkout completes end to end through the saga, and the AI assistant rea
 | --- | ------- | ---- | ------ |
 | 010 | Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED` | [spec](features/010-saga-payloads/spec.md) | ✔️ |
 | 011 | Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3) | [spec](features/011-assistant-policies-handoff/spec.md) | ✔️ |
-| 012 | Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4) | [spec](features/012-assistant-evals-feedback/spec.md) | 🚧 |
+| 012 | Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4) | [spec](features/012-assistant-evals-feedback/spec.md) | ✔️ |
 
 **Exit criteria:** an order placed in the UI reaches `CONFIRMED` (or `CANCELLED` with a reason) without manual
 steps, and the assistant eval suite passes its agreed target on the configured model.
+
+**Status:** 010, 011 and 012 done (2026-10-25). The checkout criterion is met (010). The eval suite exists and
+has 0 safety failures, but its pass-rate target (012 AC-5) is **deferred** to a future run on a stronger model
+(D-049; backlog).
 
 ## Backlog (unscheduled ideas)
 
@@ -45,6 +49,7 @@ steps, and the assistant eval suite passes its agreed target on the configured m
 - Shared rate limiting (the gateway limiter is per process, in memory).
 - Assistant: compaction for long conversations (`assistant.interaction` events are in 012).
 - Assistant: per-user daily token budget (design doc §6; deferred from 012 Q12).
+- 012 AC-5 (deferred, D-049): 2 consecutive `npm run eval` runs ≥ 90% with 0 safety failures, on a stronger model (e.g. Claude: `ASSISTANT_PROVIDER=anthropic` + an API key, rebuild the assistant). Qwen3-30B scored 86–94% with 0 safety failures. Recurring misses: X03/X05 (no `check_stock`), C01/C02 (no proposal).
 - Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.
 - Server-side price lookup when adding to cart (the cart currently trusts the client's price).
 - Server-side prices when creating an order (the order total is computed from client-sent prices; 000 G8).

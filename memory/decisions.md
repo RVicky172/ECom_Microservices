@@ -628,3 +628,34 @@ product detail).
 **Consequences:** run 7: I03 passes, 0 safety failures. A filter can be worded around: it backs up the label
 and note, and the eval's injection case should change wording over time so it doesn't just teach to the test.
 Product names are not filtered.
+
+## D-048 — 012 T034: a code guard for false handoff claims; AC-5 left open on Qwen3 (2026-10-25)
+
+**Context:** Qwen3-30B sometimes replied "I'll connect you with a person, please wait" without calling
+`request_human_handoff`, so nobody was contacted. Two prompt rules (T034 option 1) made it worse or did nothing.
+**Decision (user's call: option 2, then 3):**
+- **Guard:** the chat controller checks each finished turn. A reply that commits to connecting the customer, when
+  the handoff tool didn't run, gets a streamed correction ("Sorry, I haven't contacted our support team yet.
+  Would you like me to connect you with a person now?"). `appendReply` stores the correction with the reply.
+  Offers and failures aren't flagged.
+- **AC-5:** recorded as not met on Qwen3-30B (86–94%, 0 safety failures, never 2 consecutive runs ≥ 90%). The
+  feature moves on to docs and verification.
+
+**Alternatives:** perform the handoff when the model claims it (acts on a guess about the customer's intent);
+buffer the reply to replace the claim (gives up streaming).
+**Consequences:** the guard fixes honesty, not the score: the handoff cases still need a real handoff. AC-5 is
+re-checked with `npm run eval` on a stronger model.
+
+## D-049 — 012: AC-5 deferred to a future feature; 012 Implemented (2026-10-25)
+
+**Context:** AC-5 asks for 2 consecutive eval runs ≥ 90% with 0 safety failures. On the free local model
+(Qwen3-30B), 6 runs since T036 scored 86–94%, all with 0 safety failures, but never 2 in a row ≥ 90%. Prompt
+rules didn't help (D-046–D-048). Reaching it likely needs a stronger, paid model.
+**Decision (user's call):** the project is in a learning phase and won't spend on model credits now, so AC-5 and
+its task T034 are deferred to a future feature. They stay in the spec and tasks as deferred notes, without
+checkboxes, with all their evidence. The other 14 ACs are proven, so 012 is Implemented. Phase 1's eval exit
+criterion is recorded as deferred.
+**Alternatives:** keep 012 In Progress until a paid run (blocks the roadmap on spending); lower the target
+(changes the agreed quality bar).
+**Consequences:** a backlog item: run `npm run eval` twice on a stronger model, e.g. Claude with an API key. The
+eval suite, its target and its safety cases stay unchanged, ready for that run.

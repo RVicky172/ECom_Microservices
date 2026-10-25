@@ -11,6 +11,7 @@ import { isConfigured, runAgentTurn } from '../agent/runAgent';
 import * as conversations from '../store/conversationStore';
 import * as feedbackStore from '../store/feedbackStore';
 import { consumeUserMessage } from '../store/usageLimiter';
+import { HANDOFF_CORRECTION } from '../agent/handoffGuard';
 import { deleteConversation, getConversation, postChat, putFeedback } from './chatController';
 
 vi.mock('../agent/runAgent', () => ({
@@ -20,6 +21,11 @@ vi.mock('../agent/runAgent', () => ({
     // One bubble per message, like the real providers' transcripts.
     toTranscript: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) =>
       messages.filter((message) => message.content).map((message) => ({ role: message.role, text: message.content })),
+    // Like the OpenAI-compatible provider: text goes onto the last assistant message.
+    appendReply: (messages: Array<{ role: string; content: string }>, text: string) => [
+      ...messages.slice(0, -1),
+      { ...messages[messages.length - 1], content: messages[messages.length - 1].content + text },
+    ],
   },
   isConfigured: vi.fn(),
   runAgentTurn: vi.fn(),
@@ -120,6 +126,34 @@ beforeEach(() => {
 
 describe('postChat (012)', () => {
   const chat = (body: object = { message: 'Any keyboards?', conversationId: CONV }) => call(postChat, request({ body }));
+
+  /** A turn that streams `reply`, optionally after calling `tools`. */
+  const replyWith = (reply: string, tools: string[] = []) =>
+    runTurn.mockImplementation(async ({ emit, userMessage }) => {
+      for (const tool of tools) emit({ type: 'tool_status', tool, state: 'running' });
+      emit({ type: 'text', delta: reply });
+      return { messages: [{ role: 'user', content: userMessage }, { role: 'assistant', content: reply }], stopReason: 'stop', model: 'local-model', usage: USAGE };
+    });
+
+  it('corrects a claim to be connecting the customer when no handoff tool ran, before `done`, and stores it (D-048)', async () => {
+    const claim = "I'll connect you with a person right away. Please wait a moment.";
+    replyWith(claim);
+    const { res } = await chat({ message: 'I want to talk to a person.', conversationId: CONV });
+    const events = res.events();
+    const doneAt = events.findIndex((event: { type: string }) => event.type === 'done');
+    expect(events[doneAt - 1]).toEqual({ type: 'text', delta: HANDOFF_CORRECTION });
+    expect(save.mock.calls[0][2].messages.at(-1)).toEqual({ role: 'assistant', content: claim + HANDOFF_CORRECTION });
+  });
+
+  it('leaves a connecting reply alone when the handoff tool ran, and leaves an offer alone', async () => {
+    replyWith("I'll connect you with a person. Your reference is in the message above.", ['request_human_handoff']);
+    await chat();
+    replyWith('Would you like me to connect you with a person?');
+    const { res } = await chat();
+    expect(res.events().some((event: { delta?: string }) => event.delta === HANDOFF_CORRECTION)).toBe(false);
+    const lastReplies = save.mock.calls.map((call) => (call[2].messages.at(-1) as { content: string }).content);
+    expect(lastReplies.join(' ')).not.toContain(HANDOFF_CORRECTION.trim());
+  });
 
   it('sends a UUID answerId and the usage in `done`', async () => {
     const { res } = await chat();

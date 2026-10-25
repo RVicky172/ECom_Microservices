@@ -126,3 +126,21 @@ describe('openai-compatible provider (stubbed client)', () => {
     expect(output.model).toBe('local-model');
   });
 });
+
+describe('openai-compatible appendReply (012 D-048)', () => {
+  it("adds text to the turn's last assistant message, so the stored transcript shows it", () => {
+    const messages = [
+      { role: 'user', content: 'I want a person.' },
+      { role: 'assistant', content: "I'll connect you." },
+    ];
+    const updated = openaiCompatibleProvider.appendReply(messages, ' Correction.');
+    expect(updated.at(-1)).toEqual({ role: 'assistant', content: "I'll connect you. Correction." });
+    expect(openaiCompatibleProvider.toTranscript(updated).at(-1)).toEqual({ role: 'assistant', text: "I'll connect you. Correction." });
+    expect(messages[1].content).toBe("I'll connect you.");
+  });
+
+  it('adds a new assistant message when the last one is not a plain reply', () => {
+    const messages = [{ role: 'user', content: 'Hi' }, { role: 'tool', tool_call_id: 't1', content: '{}' }];
+    expect(openaiCompatibleProvider.appendReply(messages, 'Correction.').at(-1)).toEqual({ role: 'assistant', content: 'Correction.' });
+  });
+});

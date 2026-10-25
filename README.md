@@ -580,8 +580,10 @@ GET    /api/v1/payments/:orderId     — Get payment status
 ### Assistant
 ```
 POST   /api/v1/assistant/chat               — Send a message; reply streams as Server-Sent Events
-GET    /api/v1/assistant/conversations/:id  — Visible transcript of a conversation
-DELETE /api/v1/assistant/conversations/:id  — Delete a conversation
+GET    /api/v1/assistant/conversations/:id  — Visible transcript of a conversation, with answer IDs and saved ratings
+PUT    /api/v1/assistant/conversations/:id/answers/:answerId/feedback
+                                            — Rate an answer: { "rating": "up" } or { "rating": "down" }
+DELETE /api/v1/assistant/conversations/:id  — Delete a conversation (and its ratings)
 ```
 
 All assistant routes require a Bearer access token. The assistant is optional: set
@@ -615,6 +617,19 @@ is not set up and the store works as usual.
    └─ Kafka unavailable → the customer is told to try again later; nothing is sent
 3. Notification Service consumes → logs a simulated support email with the reference
 ```
+
+**Assistant analytics (best-effort, outside the request path):**
+
+```
+1. Each finished chat turn → Assistant Service publishes "assistant.interaction"
+   (provider, model, outcome, tool names, latency, tokens; no user ID, no text)
+2. Each thumbs up / down → "assistant.feedback" (answer ID and rating)
+   └─ Kafka unavailable → the event is dropped with one warning; chat and ratings keep working
+3. Nothing consumes them live; `npm run assistant:usage` reads both topics and prints totals per day and model
+```
+
+The assistant's behaviour is checked with `npm run eval` against the running stack and model (see the
+[assistant guide](packages/assistant-service/README.md#evals)).
 
 ---
 

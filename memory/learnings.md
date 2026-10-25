@@ -158,3 +158,6 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   action without sample wording; in 011 T035, a sample reference in the prompt was copied too.
 - Eval runs on the local model vary by 2–5 cases between identical runs, so compare a prompt change on at least 2
   runs against 2 baseline runs, never on one (012 T034).
+- In this Git Bash, a `\` inside a quoted heredoc (`<<'EOF'`) reaches the program as a single `\`, so JSON or
+  Python written that way loses escapes (`\|` became `\|`, an invalid JSON escape, three times in 012). Write
+  such text with the Write tool, or build the string in the program itself.

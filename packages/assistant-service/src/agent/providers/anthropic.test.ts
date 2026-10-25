@@ -148,3 +148,27 @@ describe('anthropic provider (stubbed SDK)', () => {
     expect(Object.keys(handoff.input_schema.properties).sort()).toEqual(['reason', 'summary']);
   });
 });
+
+describe('anthropic appendReply (012 D-048)', () => {
+  it("adds a text block to the turn's last assistant message, so the stored transcript shows it", () => {
+    const messages = [
+      { role: 'user', content: 'I want a person.' },
+      { role: 'assistant', content: [{ type: 'text', text: "I'll connect you." }] },
+    ];
+    const updated = anthropicProvider.appendReply(messages, ' Correction.');
+    expect(updated.at(-1)).toEqual({
+      role: 'assistant',
+      content: [
+        { type: 'text', text: "I'll connect you." },
+        { type: 'text', text: ' Correction.' },
+      ],
+    });
+    expect(anthropicProvider.toTranscript(updated).at(-1)?.text).toContain('Correction.');
+    expect(messages[1].content).toHaveLength(1);
+  });
+
+  it('adds a new assistant message when the last one is from the user', () => {
+    const updated = anthropicProvider.appendReply([{ role: 'user', content: 'Hi' }], 'Correction.');
+    expect(updated.at(-1)).toEqual({ role: 'assistant', content: [{ type: 'text', text: 'Correction.' }] });
+  });
+});

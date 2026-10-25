@@ -71,6 +71,8 @@ loudly (feature 010; G3/G4 closed).
 | `payment.completed` | payment | order, inventory, notification | `orderId, items, amount` |
 | `payment.failed` | payment | order, inventory, notification | `orderId, items, amount, reason: 'PAYMENT_DECLINED'` |
 | `assistant.handoff_requested` | assistant | notification | `reference, userId, conversationId, reason: 'customer_request' \| 'policy_not_covered' \| 'order_problem' \| 'other', summary (≤ 500 chars), requestedAt` (feature 011; not part of the saga, keyed by the reference) |
+| `assistant.interaction` | assistant | none live (`npm run assistant:usage` reads it) | `conversationId, answerId, provider, model, stopReason, outcome: 'answered' \| 'proposal' \| 'handoff' \| 'refused' \| 'error' \| 'limited', tools[], latencyMs, usage \| null, completedAt` (feature 012; one per finished turn, keyed by conversation ID, no user ID or text) |
+| `assistant.feedback` | assistant | none live (`npm run assistant:usage` reads it) | `conversationId, answerId, rating: 'up' \| 'down', ratedAt` (feature 012; one per vote, joined to `assistant.interaction` on `answerId`) |
 
 Rules:
 
@@ -94,6 +96,20 @@ Rules:
 `openai-compatible`). Tools (`src/agent/tools.ts`) are read-only wrappers over other services' HTTP APIs, bound to
 the caller's user ID; cart changes are only proposed and confirmed by the user in the UI. Design:
 `docs/ai-shopping-assistant.md`.
+
+- **Routes** (under `/api/v1/assistant`, JWT at the gateway): `POST /chat` (SSE), `GET /conversations/:id`
+  (transcript with `answerId`s and `ratings`), `PUT /conversations/:id/answers/:answerId/feedback`, `DELETE
+  /conversations/:id`.
+- **SSE events:** `start`, `text`, `tool_status`, `products`, `proposal`, `handoff` (`reference`,
+  `alreadyRequested`), `done` (`stopReason`, `answerId`, `usage`), `error` (a code).
+- **Untrusted text:** product descriptions reach the model only as `merchant_text_untrusted`, filtered of
+  sentences addressed to the assistant (D-047). A reply claiming a handoff that didn't happen gets a correction
+  (D-048).
+- **Analytics** are best-effort and outside the request path: published after the response, one capped attempt,
+  dropped on failure. The assistant creates its producer-only topics at startup.
+- **Evals:** `npm run eval` (`src/evals/run.ts`) calls assistant-service and the other services directly on
+  their host ports, with identity headers and `INTERNAL_SERVICE_TOKEN`, not through the gateway (its rate limit;
+  D-024). Fixtures go through the services' APIs only. It never runs in `npm test` or `npm run check`.
 
 ### Spec tracking and dashboard (004)
 

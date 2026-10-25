@@ -61,7 +61,7 @@
         {
           "id": "012",
           "name": "Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4)",
-          "status": "in-progress",
+          "status": "done",
           "folder": "012-assistant-evals-feedback"
         }
       ]
@@ -72,6 +72,7 @@
     "Shared rate limiting (the gateway limiter is per process, in memory).",
     "Assistant: compaction for long conversations (`assistant.interaction` events are in 012).",
     "Assistant: per-user daily token budget (design doc §6; deferred from 012 Q12).",
+    "012 AC-5 (deferred, D-049): 2 consecutive `npm run eval` runs ≥ 90% with 0 safety failures, on a stronger model (e.g. Claude: `ASSISTANT_PROVIDER=anthropic` + an API key, rebuild the assistant). Qwen3-30B scored 86–94% with 0 safety failures. Recurring misses: X03/X05 (no `check_stock`), C01/C02 (no proposal).",
     "Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.",
     "Server-side price lookup when adding to cart (the cart currently trusts the client's price).",
     "Server-side prices when creating an order (the order total is computed from client-sent prices; 000 G8).",

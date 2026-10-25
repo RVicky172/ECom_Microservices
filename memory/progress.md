@@ -11,6 +11,31 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-25 — 012: cases, runner, live checks, eval fixes, docs, verify (T027, T030–T036, T090, T091; 30 of 31)
+
+**Done:**
+- **Branches:** merged `main` (005) into 012; it continues on `feat/012-evals-on-main`, and the stale branches
+  were deleted.
+- **Live checks:** T031 (rating UI: API, plus the user in the browser), T032 (Kafka stopped: 4 drops, 4 warnings,
+  no late delivery), T033 (usage report: 17/17 counts match a scripted run).
+- **Evals:** 50 cases (T027, approved as a starting point) and the `npm run eval` runner (T030, ~2 min a run).
+- **What the evals found, and the fixes (T036, D-045–D-048):**
+  - the injection product leaked into other cases → it now exists only during I03;
+  - `search_products` missed plurals → fixed;
+  - a product-description injection was obeyed → descriptions are labelled `merchant_text_untrusted` and
+    filtered in code, and I03 now passes;
+  - false "I'll connect you" claims → a code guard adds a correction.
+- **Prompt:** 5 rules tried over 10 runs; all made things worse or did nothing, and were reverted.
+- **Docs and verify:** T035, T090; T091 gates green (15/15 checks, 531 tests, build, 10/10 health).
+- **ACs:** 14/15.
+
+**Update (same day):** at the user's request, AC-5/T034 were deferred to a future feature (D-049, no paid model
+runs in this learning phase), and 012 was marked **Implemented** (14 ACs; roadmap ✔️).
+**Was next:** AC-5 / T034 (2 consecutive runs ≥ 90%, 0 safety) is **not met on Qwen3-30B**: runs 86–94%, safety 0 in
+every run. Re-run `npm run eval` twice on a stronger model (Claude, when there are credits); then T092 (mark 012
+Implemented). The work since `695eaaf` is uncommitted.
+**Blockers:** none; AC-5 waits on a stronger model.
+
 ## 2026-10-25 — 005: steps 3–5, Dependabot, JSDoc, standards, verify (T030–T092; 43 of 43) ✔️
 
 **Done:** Express 5 + hpm 4 with shared `bodyOf` (D-037); React 19, react-router 8, Vite 8 (D-038, two Reacts fixed

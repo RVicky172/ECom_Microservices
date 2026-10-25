@@ -471,7 +471,7 @@ Paths below are relative to `packages/assistant-service/` unless they start with
     - **Also seen:** the CLI prints a `TimeoutNegativeWarning`. `--trace-warnings` puts it in KafkaJS 2.2.4
       (`RequestQueue.scheduleCheckPendingRequests`), not our code; Node 26 clamps it to 1 ms, so it's harmless
       (learnings).
-- [ ] **T034** — AC-5: 2 consecutive full eval runs on `qwen/qwen3-30b-a3b-2507`, each ≥ 90% overall and 100%
+- **T034 (deferred to a future feature, 2026-10-25, D-049)** — AC-5: 2 consecutive full eval runs on `qwen/qwen3-30b-a3b-2507`, each ≥ 90% overall and 100%
       safety. Record both summaries (pass rates per category, failed cases with the failing rule, flip list,
       duration, tokens). If a run misses: stop and bring the failures to the user. Prompt or code changes need the
       user's call and are test-first; then 2 new consecutive runs · files: possibly `src/agent/systemPrompt.ts`
@@ -506,6 +506,25 @@ Paths below are relative to `packages/assistant-service/` unless they start with
         `category` the catalog doesn't use);
       - D04/X04 sometimes answer without a lookup.
     - **Baseline remains** runs A/B: 44 and 45 of 50, 0 safety.
+  - **Option 2 (user's call): a code guard for false handoff claims (D-048).**
+    - **What:** `agent/handoffGuard.ts`, 17 tests: commitments such as "I'll connect you" or "connecting you now"
+      count as claims; offers and failures don't. The chat controller collects the turn's text; if it claims a
+      connection and `request_human_handoff` didn't run, it streams a correction before `done` ("Sorry, I
+      haven't contacted our support team yet. Would you like me to connect you with a person now?").
+      `provider.appendReply` (both providers, 4 tests) stores the correction with the reply, so a reload shows it.
+      Controller: 2 tests. Break check (guard skipped) → 1 fails.
+    - **It fixes honesty, not the score:** the H cases need a real handoff, so a corrected claim still fails them.
+    - **Gate:** check 15/15, 531 tests.
+    - **Runs G1** (`20261025t172826z`, 47/50, 94%) and **G2** (`20261025t173038z`, 44/50, 88%): safety 0 in both. The guard fired 0 times, because
+      the model made no false claim in these runs (handoff 5/5 in both).
+  - **Status (2026-10-25): AC-5 not met on Qwen3-30B; the user chose to move on (option 3).**
+    - **Since T036:** 6 baseline-configuration runs: 86, 88, 90, 94, 88 and (run 7) 86%. Safety failures 0 in
+      every one, so the safety half of AC-5 holds; never 2 consecutive runs at 90% or more.
+    - **Misses in every run:** X03/X05 (no `check_stock`, "which one?") and C02 (no proposal); D03/D05/X02 are
+      flaky.
+    - **Prompt wording didn't help** (5 rules tried, all reverted: D-046, D-047, T034 option 1).
+    - **Next:** re-run `npm run eval` twice on a stronger model, e.g. Claude, once there are API credits. Not
+      ticked.
 - [x] **T036** — Fixes from the T030 findings (user's call 2026-10-25, D-046). Tests first for each:
       - `search_products` matches plurals: the catalog match is a pure, tested function;
       - grader: a rule's `safety: false` overrides its case's flag; C01/C02's proposal rules use it;
@@ -562,22 +581,66 @@ Paths below are relative to `packages/assistant-service/` unless they start with
 
       Then rebuild the assistant and run the eval once · files: `agent/tools.ts`, `agent/catalogSearch.ts`,
       `agent/systemPrompt.ts`, `evals/{types,grader,cases}.ts` and their tests · test: unit + one eval run
-- [ ] **T035** [P] — Docs (plan §7):
+- [x] **T035** [P] — Docs (plan §7):
       - `docs/ai-shopping-assistant.md` (Phase 4 status: built / still open);
       - the assistant README (eval and usage report how-to, case and rule format, feedback route);
       - `specs/testing-strategy.md` (an "Assistant evals" layer);
       - `README.md` (event flow, API reference).
+  - **Result (2026-10-25):**
+    - **`docs/ai-shopping-assistant.md`:**
+      - status: Phase 4 mostly built;
+      - tool-result hygiene: the code defence (D-047);
+      - §7: evals and feedback as built (manual `npm run eval`, no CI yet);
+      - §8: the Phase 4 row with built and open items, the eval target included;
+      - a new "Implementation notes (Phase 4, feature 012)": turn result, analytics, feedback, evals, what the
+        evals found, what's open.
+    - **Assistant README:**
+      - the feedback route, plus answer IDs and ratings in the transcript;
+      - the `handoff` event and `done`'s `answerId`/`usage`;
+      - the guard step in "Follow one message";
+      - safety bullets for the injection defence and the false-claim guard;
+      - new sections: Answer feedback, Usage analytics (with `npm run assistant:usage`), and Evals (how to run,
+        what it sets up, report and exit codes, the case and rule format, run-to-run noise).
+    - **`specs/testing-strategy.md`:** an "Assistant evals (manual, live model)" layer, when to run it, and
+      `npm run eval` in the commands.
+    - **`README.md`:** the feedback route in the API reference, and an "Assistant analytics" flow next to the
+      support handoff.
+
+    `specs/architecture.md` is T090.
 
       files: as listed · test: review (AC-15)
 
 ## Verify
 
-- [ ] **T090** — Update `specs/architecture.md`: event table rows for `assistant.interaction` and
+- [x] **T090** — Update `specs/architecture.md`: event table rows for `assistant.interaction` and
       `assistant.feedback`, the assistant routes and SSE events, and the eval runner's direct-call note (D-024).
-- [ ] **T091** — Every Definition-of-Done gate green (`specs/constitution.md`): `npm run check`, `npm run build`,
+  - **Result (2026-10-25):** `specs/architecture.md`:
+    - event-table rows for `assistant.interaction` and `assistant.feedback` (fields, consumers: none live,
+      keyed by conversation ID);
+    - the Assistant section gains the routes, the SSE events (`handoff`, and `done`'s `answerId`/`usage`), the
+      untrusted-text defence (D-047) and the handoff-claim guard (D-048);
+    - best-effort analytics, and the eval runner's direct calls (D-024).
+- [x] **T091** — Every Definition-of-Done gate green (`specs/constitution.md`): `npm run check`, `npm run build`,
       the rebuilt services healthy; record the numbers (test count).
-- [ ] **T092** — Tick the ACs in `spec.md` and `feature.json` (Status `Implemented`), update `roadmap.md` and
+  - **Result (2026-10-25):**
+    - **Gates:** `npm run check` 15/15; **531 unit tests** in 47 files; `npm run build` exit 0 (the frontend's
+      >500 kB chunk warning, as before); `docker compose up -d --build assistant-service frontend`, then **10/10
+      `/health` 200**. The gateway, restarted with them, answered 000 on the first probe: it downloads tsx at
+      start-up (005 backlog).
+    - **ACs:** 14 of 15 proven and ticked (spec and feature.json):
+      - AC-1 (T027), AC-2 and AC-4 (T030), AC-3 (T016/T026), AC-6 (T030 + this gate);
+      - AC-7 (T031, the user in the browser), AC-8–AC-11 (T015/T025, T020–T022);
+      - AC-12 (T032), AC-13 (T033), AC-14 (T010–T018 break checks), AC-15 (T031, T035, T090).
+    - **AC-5 is not met** (T034: 6 runs at 86–94%, 0 safety failures, never 2 consecutive runs ≥ 90%), so 012
+      stays In Progress and T092 waits for it.
+- [x] **T092** — Tick the ACs in `spec.md` and `feature.json` (Status `Implemented`), update `roadmap.md` and
       `roadmap.json` (and Phase 1's exit status), `memory/progress.md` and `memory/MEMORY.md`.
+  - **Result (2026-10-25):** AC-5 and T034 deferred to a future feature at the user's request (D-049): reaching
+    the target needs a stronger, paid model. Both stay in the files as deferred notes, without a checkbox, with
+    all their evidence. A roadmap backlog item tracks them.
+    - **Closed:** 14 ACs ticked (T091); spec Status **Implemented**; `feature.json` `implemented` / `verified`;
+      roadmap 012 ✔️ (`done`); Phase 1: every feature done, and its eval exit criterion recorded as deferred.
+    - **Memory:** progress and MEMORY updated.
 
 ## AC coverage
 

@@ -46,6 +46,11 @@ export interface AssistantProvider {
   runTurn(input: TurnInput): Promise<TurnOutput>;
   /** User-visible text only: no tool calls, tool results or reasoning. */
   toTranscript(messages: unknown[]): TranscriptEntry[];
+  /**
+   * A copy of the history with `text` added to the turn's last reply, so a correction streamed after the model
+   * finished is stored too (D-048). The input array is not changed.
+   */
+  appendReply(messages: unknown[], text: string): unknown[];
 }
 
 /** Adds one model call's usage to the turn's total, which stays `null` until a call reports some. */

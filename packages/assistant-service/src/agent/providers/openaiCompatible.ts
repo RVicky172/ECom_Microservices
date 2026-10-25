@@ -233,6 +233,15 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
   return { messages, stopReason, model, usage };
 };
 
+/** Adds text to the last assistant message, or adds an assistant message when the last one isn't a plain reply. */
+const appendReply = (messages: unknown[], text: string): unknown[] => {
+  const last = messages.at(-1) as { role?: string; content?: unknown; tool_calls?: unknown } | undefined;
+  if (last?.role === 'assistant' && !last.tool_calls && (typeof last.content === 'string' || last.content === null)) {
+    return [...messages.slice(0, -1), { ...last, content: `${last.content ?? ''}${text}` }];
+  }
+  return [...messages, { role: 'assistant', content: text }];
+};
+
 const toTranscript = (messages: unknown[]): TranscriptEntry[] => {
   const entries: TranscriptEntry[] = [];
   for (const message of messages as ChatCompletionMessageParam[]) {
@@ -253,4 +262,5 @@ export const openaiCompatibleProvider: AssistantProvider = {
   isConfigured: () => Boolean(config.openai.baseUrl),
   runTurn,
   toTranscript,
+  appendReply,
 };
