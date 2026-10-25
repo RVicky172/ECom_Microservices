@@ -1,3 +1,4 @@
+/** Routes under `/api/v1/payments`. */
 import express from 'express';
 import * as paymentController from '../controllers/paymentController';
 

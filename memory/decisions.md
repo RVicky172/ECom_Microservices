@@ -351,6 +351,11 @@ between words are the same. `handoff: none` checks every turn; all other rules c
 
 ## D-029 — Shared emits type declarations; every package on Express 4 types (2026-10-24, chore)
 
+_Superseded by D-037 (Express 5 types everywhere); the shared declarations stay._
+
+_Copied onto the 005 branch on 2026-10-25 with its commit; D-025–D-028 are 012 decisions still on
+`feat/012-assistant-evals-feedback`._
+
 **Context:** `declaration: true` was added to `packages/shared/tsconfig.build.json` (RVicky172, during 012). Shared
 had no `@types/express`, so its `.d.ts` resolved `express` from the root `node_modules`, where api-gateway's
 `@types/express` 5.0.6 was hoisted; all other services use 4.17.25. Result: 21 type errors in 7 services
@@ -361,3 +366,214 @@ the gateway's own runtime (`express ^4.21`). No new library.
 **Alternatives:** revert `declaration: true`; Express 5 types everywhere (the runtime is Express 4).
 **Consequences:** services now type-check against real shared types (before: `any`), so producer/consumer drift
 shows at compile time; 012's code passed unchanged. Services still need shared built before their typecheck.
+
+## D-030 — 005 approved; 012 paused so 005 runs first (2026-10-25)
+
+**Context:** 005 (dependency upgrades, Dependabot, JSDoc, coding standards) was drafted on 2026-10-24 with 10 open
+questions, while 012 was in progress (20/30 tasks). 011 was waiting in PR #1.
+**Decision (RVicky172):** 011 squash-merged to `main` (PR #1, `f6a355c`). Q1, Q3–Q10 accepted as proposed (Phase 0;
+every major to latest; `uuid` → `crypto.randomUUID`; weekly Dependabot, npm + Docker; checklist in `workflow.md`;
+five upgrade steps; no ESLint/Prettier; `specs/coding-standards.md` with constitution 1.1.0; dashboard included).
+Q2: pause 012 and do 005 first, on `feat/005-dependency-upgrades-code-standards` from `main`, carrying over the
+D-029 chore commit.
+**Alternatives:** finish 012 first (the spec's proposal); branch 005 from 012's branch.
+**Consequences:** 012 resumes after 005 by rebasing onto the upgraded `main`, and its live eval runs measure the
+upgraded stack. AC-3's test baseline is 237 (012's tests are not on `main`). `decisions.md` will need a small
+merge when 012 is rebased (D-029 exists on both branches).
+
+## D-031 — 005 plan approved; P1–P5 as recommended (2026-10-25)
+
+**Context:** writing 005's plan found: no gateway circuit breaker (`opossum`, `express-rate-limit` installed but
+unused, plus 4 more unused dependencies); TypeScript 7 has no stable JS API, so `ts-node` cannot run on it;
+`react-router-dom` ends at 7 while `react-router` 8 is one package; payment needs `uuid` v5.
+**Decision (RVicky172):** P1 remove `opossum` and the other unused dependencies, AC-6 checks 502-within-timeout and
+recovery, circuit breaker to the backlog. P2 every service's `dev` runs on `tsx` (already in the stack). P3
+`react-router` 8. P4 Dependabot weekly Monday 09:00 `Asia/Kolkata`. P5 AC-5 checks the assistant turn only; ratings
+stay with 012 (T031). Spec and Changelog updated.
+**Alternatives:** add a breaker in 005 (new behaviour); keep react-router-dom 7 as an exception; Europe/Berlin.
+**Consequences:** fewer dependencies to upgrade; `ts-node` leaves the tech stack; the JSDoc checker is line-based.
+
+## D-032 — 005 T007: unused dependencies removed (2026-10-25)
+
+**Context:** a grep of `src`, `scripts` and the package files showed seven declared dependencies that nothing
+imports: gateway `express-rate-limit` and `opossum` (the gateway has its own in-memory limiter and no circuit
+breaker), order `axios`, `mongoose` and `bcryptjs`, and `joi` in payment and shared.
+**Decision:** remove them (Constitution III) instead of upgrading them. The README no longer lists opossum or
+express-rate-limit, and no longer claims a circuit breaker; rate limiting points at `middleware/rateLimiter.ts`.
+The root keeps `bcryptjs`, `mongoose`, `knex` and `pg` for `scripts/seed-data.js`.
+**Alternatives:** upgrade them anyway; wire `opossum` in (new behaviour, out of scope, D-031).
+**Consequences:** 2 packages fewer in the lockfile. The gateway, order and payment images rebuild and report healthy.
+
+## D-033 — 005 T010: TypeScript 7 everywhere; dev servers on tsx (2026-10-25)
+
+**Context:** step 1 of 005. Services and the frontend were on TypeScript 5.9 with `ts-node` dev servers; the root
+and shared were already on 7.0.2.
+**Decision:** `typescript ^7.0.2` and `@types/node ^26.6.5` in every package; `ts-node`, `@types/ioredis` and
+`@types/http-proxy-middleware` removed; every service's `dev` is `tsx watch src/index.ts` (P2, D-031).
+**Breaking changes that applied here:** none. TS 7 reported 0 new errors. `npm run check` was already running
+the root's TS 7 `tsc` for every package's typecheck, so only `npm run build` and the images changed compiler.
+`ts-node` cannot load TS 7 (its JS API is `unstable/*` only).
+**Alternatives:** keep TS 5.9 in the workspaces with ts-node.
+**Consequences:** one TypeScript major in the repo (except the dashboard until T050); 44 packages fewer in the
+lockfile.
+
+## D-034 — 005 T021: `uuid` replaced by `crypto.randomUUID` and a shared `uuidV5` (2026-10-25)
+
+**Context:** Q4 (005): `uuid` 14 is ESM-only and the repo is CommonJS. Payment also uses `v5`, which
+`crypto.randomUUID()` doesn't cover.
+**Decision:** v4 call sites (shared `kafka.ts` event IDs, `correlationId` middleware, order IDs and item IDs) use
+`randomUUID` from `node:crypto`. Shared exports `uuidV5(name, namespace)` (`src/uuid.ts`, SHA-1 per RFC 4122),
+used by payment for outcome event IDs. `uuid` and `@types/uuid` are removed from shared, order and payment.
+**Breaking changes that applied here:** none. `uuidV5` matches `uuid@9` on the RFC example and 3 recorded payment
+vectors (T006), so outcome event IDs derived before and after the switch are equal.
+**Alternatives:** `uuid` 14 via Node 26 `require(esm)`.
+**Consequences:** 4 packages fewer in the lockfile. The `uuid` <11.1.1 audit advisory is gone. Services
+type-check against shared's built `dist`, so shared must be built after a new export (seen once here).
+
+## D-035 — 005 T022–T025: joi 18, pino 10, ioredis 6, mongoose 9.11 (2026-10-25)
+
+**Context:** step 2 of 005, backend libraries. Spike T002 compared old and new side by side on our call sites.
+**Decision, one major each:**
+- **joi 17 → 18** (auth, cart, inventory, order, product). **Breaking changes that applied here:** none; same
+  error messages and values for every construct we use. `validate(undefined)` still passes (see T030).
+- **pino 9 → 10** (shared logger). None; the same JSON keys, level label and ISO time.
+- **ioredis 5 → 6** (assistant, cart, product). None; identical replies for every command we call, and
+  `import Redis from 'ioredis'` still works.
+- **mongoose 8 → 9.11** (product; the root seed script already used 9, now 9.11.4). None found; `connect`, schema
+  with timestamps, `insertMany`, `find` with a regex and `lean` work.
+
+**Alternatives:** none considered (Q3: latest stable).
+**Consequences:** live on the rebuilt stack: products list and search, product by ID, cart add/update/remove,
+joi 400 bodies unchanged, correlation IDs in the logs.
+
+## D-036 — 005 T026: bcryptjs 3 (2026-10-25)
+
+**Context:** step 2 of 005. Auth and the root seed script hash passwords with bcryptjs 2.4.3.
+**Decision:** `bcryptjs ^3.0.3` in auth and the root. `@types/bcryptjs` is removed, because 3 ships its own types
+(`umd/index.d.ts` for `require`).
+**Breaking changes that applied here:** new hashes start `$2b$` instead of `$2a$`. `compare` accepts both, so
+existing users keep signing in. The package is `"type": "module"` with a `require` export, so CommonJS is fine.
+**Alternatives:** none (Q3).
+**Consequences:** `authService.test.ts` pins a 2.4.3 hash. Live: the pre-upgrade user (`$2a$`) signs in, and a new
+user is stored as `$2b$` and signs in.
+
+## D-037 — 005 T032: Express 5, http-proxy-middleware 4, TypeScript `module: node20` (2026-10-25)
+
+**Supersedes D-029's Express 4 types.** The shared type declarations stay.
+**Context:** step 3 of 005. Express 4.22 with `@types/express` 4 everywhere; gateway on http-proxy-middleware 3.
+**Decision:** `express ^5.3.0` in the gateway and 8 services; `@types/express ^5.0.6` in those and shared;
+`http-proxy-middleware ^4.2.1` in the gateway.
+**Breaking changes that applied here:**
+- `req.body` is `undefined` without a body → shared `bodyOf(req)` at the 8 validation call sites, plus 11 tests
+  (T030/T031).
+- `@types/express` 5 types `req.params` values as `string | string[]` (path-to-regexp 8 wildcards) → 13
+  handlers are typed with their route params (`Request<{ id: string }>` etc.). There were 17 type errors in 6
+  services; no runtime change.
+- http-proxy-middleware 4 is ESM-only. Node 26 `require()`s it fine, but TypeScript's `module: Node16` refuses
+  (TS1479). The root `tsconfig.json` now uses `"module": "node20"`, which allows `require(esm)` and still emits
+  CommonJS. `proxy.ts` is unchanged (spike T002).
+- Not hit: path syntax (no wildcards or optional params in our routes); `req.query` assignment (none).
+
+**Alternatives:** stay on Express 4 (Q3: no); a cast or `String()` at each `req.params` use; a dynamic
+`import()` of hpm.
+**Consequences:** live: 401 without a JWT, empty-body POSTs → 400 (same messages), a stopped cart → 502 then
+200 after restart, the 101st request → 429, and SSE through the gateway (headers and events).
+
+## D-038 — 005 T040: React 19, react-router 8, Vite 8 (2026-10-25)
+
+**Context:** step 4 of 005, the storefront (React 18.3, react-router-dom 6.30, Vite 5.4, plugin-react 4.7).
+**Decision:** `react`/`react-dom ^19.3.1` and their types `^19.3.0`; `react-router ^8.5.0` replaces
+`react-router-dom` (P3, D-031); `vite ^8.3.5`; `@vitejs/plugin-react ^6.1.2`.
+**Breaking changes that applied here:**
+- react-router 8 is one package, so the 8 imports moved from `'react-router-dom'` to `'react-router'`. The APIs we
+  use (`createBrowserRouter`, `RouterProvider`, `Navigate`, `Outlet`, `NavLink`, `Link`, `useLocation`,
+  `useMatches`) are unchanged.
+- React 19: none for this code (`createRoot` was already used).
+- Vite 8 (Rolldown): none; the config is unchanged.
+- **npm left React 18 hoisted at the root** for `react-redux` and `@reduxjs/toolkit` (peer placement from the old
+  lock), while the frontend got 19 nested: two Reacts. `npm dedupe` fixed it; one React 19 everywhere.
+
+**Alternatives:** react-router-dom 7.18.4 (the last of that package).
+**Consequences:** the bundle grows from 616 kB to 711 kB (gzip 189 → 220 kB); Vite's >500 kB warning was already
+there. The react-router ≤7.17 audit advisories are gone.
+
+## D-039 — 005 T050: the spec dashboard on TypeScript 7 (2026-10-25)
+
+**Context:** the dashboard stayed on TypeScript 5.9 because Next.js's build-time type check needed it (D-005).
+Spike S3 (T004) showed that Next 16.4.3 type-checks with TS 7.0.2 and fails the build on a type error.
+**Decision:** `next ^16.4.3`, `typescript ^7.0.2` and `@types/node ^26.6.5` in `tools/spec-dashboard`. No exception E1.
+**Breaking changes that applied here:** none; no code change.
+**Alternatives:** keep 5.9 as exception E1.
+**Consequences:** one TypeScript major in the whole repo, dashboard included. D-005's reason for 5.9 no longer holds.
+
+## D-040 — 005 T062: AC-2 covers declared libraries only (2026-10-25)
+
+**Context:** after the upgrade, a lockfile scan found two transitive packages in two majors: `mime-types` 3 (express
+5) and 2 (`form-data` via axios), and `picomatch` 4 (vite, vitest) and 2 (`micromatch` via http-proxy-middleware 4).
+Each is held on the old major by an upstream package's own range, and those upstreams are on their latest versions.
+**Decision (user's call):** AC-2 applies to the libraries a `package.json` in this repo declares and to their
+`@types`. Transitive duplicates pinned upstream are listed in tasks.md, not forced with npm `overrides`.
+**Alternatives:** `overrides` to one major each (against the upstream ranges, untested by their authors).
+**Consequences:** AC-2 is met. Dependabot will pick these up when the upstreams move.
+
+## D-041 — 005 T076: what counts as a JSDoc block for the doc check (2026-10-25)
+
+**Context:** plan §7 said an export needs "a `*/` on the line above". The first implementation showed two holes:
+a `/* */` or the file header's own `*/` passed, so a file whose first export sits right under its header was
+reported as documented.
+**Decision:** the line above must close a `/**` block (not `//` or `/* */`), and that block must not be the file's
+header. `export type { … }` lists are skipped like re-exports. Plan §7 updated; each case has a test.
+**Alternatives:** the plan's looser rule (fewer comments to write, but AC-10 asks for a JSDoc block per export).
+**Consequences:** a file with a header and an export right under it needs two comments.
+
+## D-042 — 005 T085: distributed-system rules in the coding standards (2026-10-25)
+
+**Context:** the user reviewed the draft `specs/coding-standards.md` and suggested rules for tracing,
+configuration, Kafka failures, event evolution and contract tests.
+**Decision:** add rules 9–13, each grounded in the repo with an example and a counter-example or a stated gap:
+correlation ID on every hop; fail-fast configuration (safe local defaults allowed, secrets checked); a bad message
+must not stop the consumer (today's log-and-skip); additive event changes (a new closed-set value is not
+additive); a contract test per event. The JSDoc rule becomes 14.
+**Not adopted:** OpenTelemetry (correlation IDs and structured logs suffice; Constitution III); a dead-letter
+topic now (it is new behaviour, so a feature of its own).
+**Consequences:** three gaps to fix go to the backlog in T087: a Kafka dead-letter topic with retry, the outbox
+relay sending the order ID as `correlation-id`, and the `JWT_SECRET` fallback.
+
+## D-043 — 005 T085: naming, structure and resilience rules; rules renumbered (2026-10-25)
+
+**Context:** a second review by the user proposed file-size limits, naming conventions, nesting limits, logging,
+timeouts, retries, circuit breakers, dead-letter queues and event versioning.
+**Decision:** adopted, adapted to the repo, each with a repo example and a counter-example (or a stated gap):
+- **naming:** a conventions table matching what the repo already does;
+- **files:** a 100–200 code-line target with a hard limit of 300 (all 113 files are within 200 today);
+- **one responsibility per file**, instead of one export per file: layered controllers export a handler per
+  route, and `events.ts` is the shared contract;
+- **functions:** nesting ≤ 3 with guard clauses;
+- **logging:** with the correlation ID, no `console.log`;
+- **outbound calls:** timeouts on each, and retries with backoff only for transient failures;
+- **dead-letter topic:** a stated target, not built;
+- **events:** versioned topics for breaking changes.
+
+Rules are renumbered 1–16 (D-042's 9–14 are now 10–16).
+**Not adopted now:** OpenTelemetry (planned; backlog) and a circuit breaker (already in the backlog, P1). Both
+are new behaviour.
+**Consequences:** two more backlog items in T087: OpenTelemetry tracing, and proxy timeouts for every gateway
+route plus Redis command timeouts. The standards apply to new and changed code; existing counter-examples are
+fixed when that code is touched.
+
+## D-044 — 005 T086: constitution 1.1.0 and a file-size gate (2026-10-25)
+
+**Context:** AC-12 asks for the coding standards to be referenced from the constitution with a version bump. The
+user also asked for the file-size rule (standards rule 7) to be checked, not only written down.
+**Decision:**
+- **Constitution 1.0.0 → 1.1.0** (MINOR: a quality gate added, no principle changed). Definition-of-Done item 6
+  says new and changed code follows `specs/coding-standards.md`; `npm run check` enforces its JSDoc and file-size
+  rules, and the rest is checked in review.
+- **File-size gate:** `scripts/check-size.mjs` (rule in `scripts/lib/sizeCheck.mjs`, unit-tested) fails a
+  non-test source file over 300 code lines and warns over 200. Comments and blank lines don't count, so
+  documentation never pushes a file over. `npm run check` has 15 checks.
+
+**Alternatives:** count all lines (would penalise the JSDoc that AC-10 requires); warn only (the user asked for a
+check).
+**Consequences:** the largest file today is 194 code lines, so nothing fails. The naming and nesting rules stay
+review-only (no parser dependency; Constitution III).

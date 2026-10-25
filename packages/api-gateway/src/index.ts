@@ -1,3 +1,7 @@
+/**
+ * API gateway entry point: the one public HTTP port. Applies CORS, correlation IDs, CSRF and rate limiting,
+ * then proxies `/api/v1/*` to the services (see `proxy.ts`).
+ */
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createLogger, errorHandler, correlationId } from '@ecommerce/shared';

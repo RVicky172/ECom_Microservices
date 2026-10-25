@@ -1,3 +1,4 @@
+/** Assistant service entry point: the chat API that streams the shopping assistant's replies as Server-Sent Events. */
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import { isConfigured, provider } from './agent/runAgent';

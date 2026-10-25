@@ -1,3 +1,4 @@
+/** The notification service's Kafka consumer: which saga events it listens to and which email each one sends. */
 import {
   KafkaTopics,
   parseHandoffRequested,

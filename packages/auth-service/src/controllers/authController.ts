@@ -1,6 +1,10 @@
+/**
+ * HTTP handlers for `/api/v1/auth`: validate the request, call the auth service, and set or clear the session
+ * cookies.
+ */
 import type { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
-import { REFRESH_COOKIE_NAME, UnauthorizedError } from '@ecommerce/shared';
+import { bodyOf, REFRESH_COOKIE_NAME, UnauthorizedError } from '@ecommerce/shared';
 import * as authService from '../services/authService';
 
 const REFRESH_TOKEN_TTL_SECONDS = Number(process.env.REFRESH_TOKEN_TTL_SECONDS || 604800);
@@ -38,9 +42,13 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+/**
+ * `POST /register` with `{ email, password, name }`: creates the user and signs them in (201 with the user and an
+ * access token; the refresh token goes in its cookie). 409 if the email is taken.
+ */
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error, value } = registerSchema.validate(req.body);
+    const { error, value } = registerSchema.validate(bodyOf(req));
     if (error) {
       res.status(400).json({ error: { code: 400, message: error.details[0].message } });
       return;
@@ -54,9 +62,13 @@ export const register = async (req: Request, res: Response, next: NextFunction):
   }
 };
 
+/**
+ * `POST /login` with `{ email, password }`: signs in. A wrong password and an unknown email give the same 400, so
+ * the answer doesn't reveal which emails exist.
+ */
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error, value } = loginSchema.validate(req.body);
+    const { error, value } = loginSchema.validate(bodyOf(req));
     if (error) {
       res.status(400).json({ error: { code: 400, message: error.details[0].message } });
       return;
@@ -70,6 +82,10 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
   }
 };
 
+/**
+ * `POST /refresh`: swaps the refresh cookie for a new access token and a new refresh token (rotation). With no
+ * valid cookie it answers `{ accessToken: null }`, not an error, so the storefront can call it on every load.
+ */
 export const refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const refreshToken = readCookie(req, REFRESH_COOKIE_NAME);
@@ -92,6 +108,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
+/** `POST /logout`: revokes the refresh session and clears both cookies (204). */
 export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     await authService.revokeRefreshToken(readCookie(req, REFRESH_COOKIE_NAME));
@@ -103,6 +120,7 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
   }
 };
 
+/** `GET /profile`: the signed-in user (the gateway requires a JWT and sets `x-user-id`). */
 export const getProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.headers['x-user-id'];

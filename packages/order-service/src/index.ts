@@ -1,3 +1,4 @@
+/** Order service entry point: the orders HTTP API, migrations, the outbox relay and the saga consumer. */
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import orderRoutes from './routes/orderRoutes';

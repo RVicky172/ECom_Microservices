@@ -2,19 +2,18 @@
 
 > Read this first every session. Keep ≤ 40 lines. Rules: `specs/memory-management.md`.
 
-## Current State (2026-10-24)
+## Current State (2026-10-25)
 
-- **Phase:** 1 (Checkout & Assistant). Phase 0 complete 2026-10-23 (CI moved to backlog, D-012). SDD since 2026-10-23 (D-001).
-- **Active feature:** 012 assistant evals + feedback + analytics — 🚧 In Progress 2026-10-24 (spec D-023, plan D-024); tasks.md 20/30 (T001, T002, T010–T018, T020–T026, T028, T029 done)
-  (`specs/features/012-assistant-evals-feedback/`). 011 assistant policies + handoff ✔️ Implemented 2026-10-24 (13/13 ACs; D-016–D-022):
-  policies 10/10 + 3/3 on Qwen3, first-ask handoff 4/4, product answers grounded 7/7, Kafka-down safe (D-021).
-  Phase 1: 010 ✔️, 011 ✔️; 012 🚧.
-- **Drafted 2026-10-24:** 005 dependency upgrades + Dependabot + JSDoc + coding standards — 📝 Draft, 10 open questions
-  (`specs/features/005-dependency-upgrades-code-standards/`); proposed to run after 012 (Q2).
-- **Next step:** `/spec-implement 012` T031 (rebuild + storefront check of the feedback buttons); T027 cases need the user's review. Shared now emits `.d.ts` (D-029); usage mapping D-025. Load LM Studio per
-  `docs/lm-studio-setup.md` before live eval runs. 011 is in PR #1; 012 work is on branch `feat/012-assistant-evals-feedback`.
-- **Testing:** `npm test` (Vitest, `packages/*/src/**/*.test.ts`, 426 tests); `npm run check` runs it. Node 26
-  everywhere (D-009).
+- **Phase:** 1 (Checkout & Assistant). Phase 0 fully done: exit criteria met 2026-10-23 (CI in backlog, D-012), and 005 ✔️ 2026-10-25. SDD since 2026-10-23 (D-001).
+- **Active feature:** 012 assistant evals + feedback + analytics — 🚧 In Progress (spec D-023, plan D-024); tasks.md 20/30 (T001, T002, T010–T018, T020–T026, T028, T029 done)
+  (`specs/features/012-assistant-evals-feedback/`), branch `feat/012-assistant-evals-feedback`. **`main` merged in 2026-10-25** (005 upgrades + standards), so 012 now
+  runs on Express 5, React 19, TS 7 and must pass check-docs + check-size and follow `specs/coding-standards.md`.
+- **Done:** 011 ✔️ (PR #1, `f6a355c`); 005 ✔️ Implemented 2026-10-25, 13/13 ACs (PR #2 `fa27285` upgrades, PR #3 `60f6041` standards/records).
+  005 left: `specs/coding-standards.md` (16 rules, constitution 1.1.0, D-044), Dependabot (alerts + security updates on), 15-check gate.
+- **Next step:** `/spec-implement 012` T031 (rebuild + storefront check of the feedback buttons); T027 cases need the user's review. Load LM Studio per
+  `docs/lm-studio-setup.md` before live eval runs. Baseline user creds in `.env.local-notes`.
+- **Testing:** `npm test` (Vitest: `packages/*/src/**/*.test.ts` + `scripts/**/*.test.mjs`); `npm run check` = 15 checks (typecheck ×11, unit tests,
+  JSDoc, file size, dashboard). Node 26, TypeScript 7 everywhere (D-009, D-033).
 - **Tracking:** status lives in `specs/roadmap.json` + `feature.json` too; keep in sync (D-005). View: `npm run dashboard`.
 - **Blockers:** none
 - **Built before SDD (recorded in 000 `baseline.md`):** React Router frontend; AI assistant service (design-doc phases 0–2)

@@ -4,6 +4,7 @@
  */
 import type { AssistantEvent } from '../agent/events';
 
+/** Incremental SSE parser: `push` each chunk and get back the events it completed. */
 export class SseParser {
   private buffer = '';
 

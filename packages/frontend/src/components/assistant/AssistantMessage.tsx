@@ -1,3 +1,4 @@
+/** A message bubble in the assistant chat. */
 import type { AnswerRating, ChatItem } from '../../types/assistant';
 import { formatCurrency } from '../../utils/storePresentation';
 import { FeedbackButtons } from './FeedbackButtons';

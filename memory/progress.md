@@ -11,6 +11,43 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-25 — 005: steps 3–5, Dependabot, JSDoc, standards, verify (T030–T092; 43 of 43) ✔️
+
+**Done:** Express 5 + hpm 4 with shared `bodyOf` (D-037); React 19, react-router 8, Vite 8 (D-038, two Reacts fixed
+by `npm dedupe`); dashboard on TS 7 (D-039). Clean rebuild 139 s, 10/10 healthy; end to end: the pre-upgrade user,
+cart, CONFIRMED and CANCELLED/OUT_OF_STOCK orders, an assistant turn streamed on LM Studio. `npm outdated` empty,
+audit 0; AC-2 narrowed to declared libraries (D-040). Dependabot config, plus a review checklist. PR #2 merged; on
+GitHub, 3 update jobs succeeded and alerts went from 26 to 0. JSDoc checker (D-041) with 113 files / 266 exports
+documented (comments only, verified against a snapshot), and a file-size gate (D-044). `specs/coding-standards.md`:
+16 rules, two review rounds with the user (D-042, D-043); constitution 1.1.0. Records, README and architecture
+updated. Verify: check 15/15, build 0, 283 tests, 10/10 /health on rebuilt images, 13/13 ACs.
+**Next:** commit and PR `feat/005-standards-and-records` (uncommitted); then rebase 012 onto `main` and resume
+it (T031).
+**Blockers:** none. One `npm run check` failure during T087 could not be reproduced (7 green runs since). The
+gateway image downloads tsx at start-up (pre-existing; backlog).
+
+## 2026-10-25 — 005: setup, upgrade steps 1–2 (T001–T007, T010, T020–T027; 16 of 43)
+
+**Done:** baseline (24 outdated packages, audit 2 high + 3 moderate, 237 tests, the baseline user registered);
+spikes: no exceptions needed, `proxy.ts` unchanged under hpm 4 + Express 5, Next type-checks with TS 7. Removed
+7 unused deps (D-032). Step 1: TS 7 + @types/node 26 everywhere, 0 new errors, dev on tsx (D-033). Step 2:
+`uuid` → `randomUUID` + shared `uuidV5` matching uuid@9 (D-034); joi 18, pino 10, ioredis 6, mongoose 9.11
+(D-035); bcryptjs 3, with an old-hash test (D-036); pg and Anthropic SDK minors. Live: 10/10 healthy, cart,
+validation, the baseline user's sign-in, and an order CONFIRMED. The seed script was not run (it wipes products);
+its Mongo ops were checked on a scratch DB. Gate: check 13/13, 246 tests, build 0. Nothing committed yet.
+**Next:** T030 (Express 5 empty-body tests).
+**Blockers:** none
+
+## 2026-10-25 — 011 merged; 012 paused; 005 spec approved
+
+**Done:** check 13/13 on 011, PR #1 squash-merged (`f6a355c`). 012's branch rebased onto `main` without the 011
+commits (local; remote not yet force-pushed). New branch `feat/005-dependency-upgrades-code-standards` from `main`
+with the 005 draft and the D-029 chore cherry-picked. 005 Q1, Q3–Q10 accepted as proposed, Q2 = 005 first (D-030);
+spec Approved, tracking JSON and roadmap synced. Plan written; P1–P5 accepted as recommended (D-031: no circuit
+breaker exists → removed with 5 other unused deps; `dev` on tsx; react-router 8; Dependabot Asia/Kolkata; ratings stay
+with 012). Tasks: 43 (T001–T092), spec In Progress. Gate: check 13/13, 237 tests.
+**Next:** `/spec-implement 005` from T001.
+
 ## 2026-10-24 — 012: spikes T001, T002; shared analytics events T010, T020; provider usage T011, T021; observer T012, T022; handoff event T013, T023; publishers T014, T024; controller T015, T025; eval core T016, T026; usage report T017, T028; feedback UI T018, T029; chore D-029
 
 **Done:** T001: LM Studio sends usage only with `include_usage`, as a last chunk with `choices: []`, no cached

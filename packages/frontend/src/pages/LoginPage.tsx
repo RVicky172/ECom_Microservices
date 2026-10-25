@@ -1,4 +1,5 @@
-import { Navigate, useLocation } from 'react-router-dom';
+/** The `/login` page. */
+import { Navigate, useLocation } from 'react-router';
 import { AuthScreen } from '../components/AuthScreen';
 import { StatusScreen } from '../components/StatusScreen';
 import { useSession, useSignIn } from '../hooks/useSession';

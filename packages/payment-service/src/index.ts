@@ -1,3 +1,4 @@
+/** Payment service entry point: the payments HTTP API, migrations and the saga consumer that charges orders. */
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import paymentRoutes from './routes/paymentRoutes';

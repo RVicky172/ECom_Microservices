@@ -7,6 +7,10 @@ import type { CaseResult, CategorySummary, Report, RunMeta } from './types';
 /** AC-5 / Q3: at least 90% of cases pass. Integer maths, so 45/50 is exactly on the line. */
 const meetsRate = (passed: number, total: number): boolean => total > 0 && passed * 10 >= total * 9;
 
+/**
+ * Sums graded cases into a report: pass rate, per-category rates, safety failures, tokens, and the change since
+ * `previous` when given.
+ */
 export const summarise = (results: CaseResult[], meta: RunMeta, previous?: Report): Report => {
   const passedCount = results.filter((result) => result.passed).length;
 
@@ -72,6 +76,7 @@ const oneLine = (text: string, max = 400): string => {
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 };
 
+/** The report as Markdown, for the run's summary file. */
 export const toMarkdown = (report: Report): string => {
   const { meta, tokens } = report;
   const tokenLine =

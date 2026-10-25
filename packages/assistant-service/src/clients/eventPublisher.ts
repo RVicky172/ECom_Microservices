@@ -30,6 +30,7 @@ const getProducer = () =>
     throw error;
   }));
 
+/** One event to publish with a single, time-capped attempt. */
 export interface CappedPublish {
   topic: KafkaTopics;
   type: EventTypes;

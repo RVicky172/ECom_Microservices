@@ -1,5 +1,7 @@
+/** HTTP handlers for `/api/v1/cart`, always for the signed-in user (`x-user-id` from the gateway). */
 import type { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
+import { bodyOf } from '@ecommerce/shared';
 import * as cartService from '../services/cartService';
 
 const addItemSchema = Joi.object({
@@ -15,6 +17,7 @@ const updateSchema = Joi.object({
 
 const getUserId = (req: Request): string => req.headers['x-user-id'] as string;
 
+/** `GET /`: the user's cart, empty if they have none. */
 export const getCart = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const cart = await cartService.getCart(getUserId(req));
@@ -24,9 +27,13 @@ export const getCart = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
+/**
+ * `POST /items` with `{ productId, name, price, quantity }`: adds the item, or adds to its quantity if it is
+ * already in the cart (201).
+ */
 export const addItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error, value } = addItemSchema.validate(req.body);
+    const { error, value } = addItemSchema.validate(bodyOf(req));
     if (error) {
       res.status(400).json({ error: { code: 400, message: error.details[0].message } });
       return;
@@ -38,9 +45,10 @@ export const addItem = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
-export const updateItemQuantity = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+/** `PUT /items/:id` with `{ quantity }`: sets the item's quantity; 0 removes it. */
+export const updateItemQuantity = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error, value } = updateSchema.validate(req.body);
+    const { error, value } = updateSchema.validate(bodyOf(req));
     if (error) {
       res.status(400).json({ error: { code: 400, message: error.details[0].message } });
       return;
@@ -52,7 +60,8 @@ export const updateItemQuantity = async (req: Request, res: Response, next: Next
   }
 };
 
-export const removeItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+/** `DELETE /items/:id`: removes the item; 404 if it isn't in the cart. */
+export const removeItem = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
   try {
     const cart = await cartService.removeItem(getUserId(req), req.params.id);
     res.json(cart);
@@ -61,6 +70,7 @@ export const removeItem = async (req: Request, res: Response, next: NextFunction
   }
 };
 
+/** `DELETE /`: empties the cart. */
 export const clearCart = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const cart = await cartService.clearCart(getUserId(req));

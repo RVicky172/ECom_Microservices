@@ -243,6 +243,10 @@ const toTranscript = (messages: unknown[]): TranscriptEntry[] => {
   return entries;
 };
 
+/**
+ * The provider for any `/v1/chat/completions` server (LM Studio, Ollama, vLLM): runs the tool loop itself with
+ * function calling.
+ */
 export const openaiCompatibleProvider: AssistantProvider = {
   id: 'openai-compatible',
   describeModel: () => config.model || resolvedModel || `auto (first model at ${config.openai.baseUrl})`,

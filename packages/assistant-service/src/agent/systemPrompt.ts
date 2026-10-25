@@ -58,4 +58,5 @@ Store policies:
 ${policies}
 </store_policies>`;
 
+/** The system prompt with the store policies inlined, built once at startup. */
 export const SYSTEM_PROMPT = buildSystemPrompt(loadPolicies());

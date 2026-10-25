@@ -1,3 +1,4 @@
+/** The assistant's chat window. */
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import type { useAssistantChat } from '../../hooks/useAssistantChat';
 import { AssistantMessage } from './AssistantMessage';

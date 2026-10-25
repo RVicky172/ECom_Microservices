@@ -1,4 +1,8 @@
-import { v4 as uuidv4 } from 'uuid';
+/**
+ * Orders: creating one with its outbox event in a single transaction, status changes through the state machine,
+ * and reads scoped to their owner.
+ */
+import { randomUUID } from 'node:crypto';
 import { db } from '../models/orderModel';
 import { OrderStatus, canTransitionOrder, EventTypes, NotFoundError, ValidationError, isUuid } from '@ecommerce/shared';
 import type { CancelReason, OrderCreatedData } from '@ecommerce/shared';
@@ -50,7 +54,7 @@ export const createOrder = async ({
   }
 
   const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const orderId = uuidv4();
+  const orderId = randomUUID();
 
   // Single transaction: order + items + outbox event (Section 9.3 — no dual-write)
   await db.transaction(async (trx) => {
@@ -63,7 +67,7 @@ export const createOrder = async ({
     });
 
     const orderItems = items.map((item) => ({
-      id: uuidv4(),
+      id: randomUUID(),
       order_id: orderId,
       product_id: item.productId,
       product_name: item.name,
@@ -86,7 +90,7 @@ export const createOrder = async ({
       totalAmount,
     };
     await trx('outbox_events').insert({
-      id: uuidv4(),
+      id: randomUUID(),
       aggregate_type: 'Order',
       aggregate_id: orderId,
       event_type: EventTypes.ORDER_CREATED,
@@ -155,6 +159,7 @@ export const getOrderById = async (orderId: string): Promise<any> => {
   return { ...order, items };
 };
 
+/** A page of the user's orders, newest first, without their items. */
 export const getOrdersByUserId = async (
   userId: string,
   page: number,

@@ -16,8 +16,10 @@ const MAX_RETRY_DELAY_MS = 30_000;
 const retryDelay = (attempt: number): number => Math.min(1000 * 2 ** attempt, MAX_RETRY_DELAY_MS);
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** The producer-only topics this service must create itself. */
 export const ANALYTICS_TOPICS = [KafkaTopics.ASSISTANT_INTERACTION, KafkaTopics.ASSISTANT_FEEDBACK];
 
+/** Where to log, plus Kafka, topic creation and `sleep` injectable for tests. */
 export interface EnsureAnalyticsTopicsOptions {
   logger: Logger;
   createKafka?: (clientId: string) => Kafka;

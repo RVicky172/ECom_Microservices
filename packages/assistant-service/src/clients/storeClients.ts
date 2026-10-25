@@ -5,6 +5,7 @@
 import type { RequestContext } from '../context';
 import { getJson, ServiceError } from './serviceClient';
 
+/** A catalog product (product service). */
 export interface Product {
   _id: string;
   name: string;
@@ -14,12 +15,14 @@ export interface Product {
   imageUrl?: string;
 }
 
+/** A stock row (inventory service). */
 export interface StockLevel {
   product_id: string;
   quantity: number;
   reserved: number;
 }
 
+/** One line of the cart (cart service). */
 export interface CartItem {
   productId: string;
   name: string;
@@ -27,12 +30,14 @@ export interface CartItem {
   quantity: number;
 }
 
+/** The user's cart (cart service). */
 export interface Cart {
   items: CartItem[];
   itemCount: number;
   total: number | string;
 }
 
+/** An order in the user's order list (order service). */
 export interface OrderSummary {
   id: string;
   user_id: string;
@@ -41,12 +46,14 @@ export interface OrderSummary {
   created_at: string;
 }
 
+/** One order with its items (order service). */
 export interface OrderDetail extends OrderSummary {
   shipping_address?: string;
   updated_at?: string;
   items: Array<{ product_id: string; product_name?: string; quantity: number; price: number | string }>;
 }
 
+/** The payment of an order (payment service). */
 export interface Payment {
   order_id: string;
   amount: number | string;
@@ -60,6 +67,7 @@ export const listProducts = async (ctx: RequestContext): Promise<Product[]> => {
   return products;
 };
 
+/** One product by ID. */
 export const getProduct = (ctx: RequestContext, productId: string): Promise<Product> =>
   getJson<Product>('product', `/api/v1/products/${encodeURIComponent(productId)}`, ctx);
 
@@ -73,6 +81,7 @@ export const getStock = async (ctx: RequestContext, productId: string): Promise<
   }
 };
 
+/** The current user's cart. */
 export const getCart = (ctx: RequestContext): Promise<Cart> => getJson<Cart>('cart', '/api/v1/cart', ctx);
 
 /** The current user's orders, newest first. */

@@ -32,6 +32,7 @@ microservices behind an API gateway, with a React storefront and an AI shopping 
 | --------------------------- | ------------------------------------------------------- |
 | `specs/constitution.md`     | Before any design decision; contains Definition of Done |
 | `specs/architecture.md`     | Before touching shared code or adding a module          |
+| `specs/coding-standards.md` | Before writing or reviewing code (patterns and rules)   |
 | `specs/tech-stack.md`       | Before adding any dependency                            |
 | `specs/testing-strategy.md` | Before writing tests                                    |
 | `specs/roadmap.md`          | Choosing what's next                                    |
@@ -40,7 +41,7 @@ microservices behind an API gateway, with a React storefront and an AI shopping 
 ## Commands
 
 ```bash
-npm run check  # fast gate — typechecks all packages and runs unit tests; must pass before any task is ticked
+npm run check  # fast gate — typechecks all packages, runs unit tests, the JSDoc and file-size checks; must pass before any task is ticked
 npm test       # unit tests (Vitest, packages/*/src/**/*.test.ts; needs Node ≥ 26)
 npm run build  # production build of every package
 npm run dashboard  # spec dashboard on http://127.0.0.1:3100 (separate process, live)

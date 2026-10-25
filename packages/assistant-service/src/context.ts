@@ -1,3 +1,4 @@
+/** The per-request identity the assistant's tools act for. */
 /**
  * Who the current request is for.
  *

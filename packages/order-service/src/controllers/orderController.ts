@@ -1,6 +1,7 @@
+/** HTTP handlers for `/api/v1/orders`, always scoped to the signed-in user. */
 import type { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
-import { requireUserId } from '@ecommerce/shared';
+import { bodyOf, requireUserId } from '@ecommerce/shared';
 import * as orderService from '../services/orderService';
 
 interface CreateOrderItem {
@@ -25,9 +26,13 @@ const createOrderSchema = Joi.object({
   shippingAddress: Joi.string().allow('').optional(),
 });
 
+/**
+ * `POST /` with `{ items, shippingAddress? }`: places a `PENDING` order and starts the checkout saga (201). An
+ * invalid or missing body is a 400.
+ */
 export const createOrder = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error, value } = createOrderSchema.validate(req.body);
+    const { error, value } = createOrderSchema.validate(bodyOf(req));
     if (error) {
       res.status(400).json({ error: { code: 400, message: error.details[0].message } });
       return;
@@ -51,6 +56,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+/** `GET /?page&limit`: the user's orders, newest first (default page 1, 20 per page). */
 export const getOrders = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = requireUserId(req);
@@ -66,7 +72,8 @@ export const getOrders = async (req: Request, res: Response, next: NextFunction)
   }
 };
 
-export const getOrderById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+/** `GET /:id`: one of the user's orders with its items. Another user's order, or a malformed ID, is a 404. */
+export const getOrderById = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = requireUserId(req);
     const order = await orderService.getOrderForUser(req.params.id, userId);

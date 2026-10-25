@@ -144,6 +144,7 @@ const toTranscript = (messages: unknown[]): TranscriptEntry[] => {
   return entries;
 };
 
+/** The Claude API provider: runs the turn with the Anthropic SDK's tool runner. */
 export const anthropicProvider: AssistantProvider = {
   id: 'anthropic',
   describeModel: () => config.model,

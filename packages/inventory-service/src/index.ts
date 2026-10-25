@@ -1,3 +1,7 @@
+/**
+ * Inventory service entry point: the stock HTTP API, its migrations, and the saga consumer that reserves,
+ * releases and finalizes stock.
+ */
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import inventoryRoutes from './routes/inventoryRoutes';

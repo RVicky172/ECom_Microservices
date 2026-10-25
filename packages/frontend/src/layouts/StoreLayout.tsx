@@ -1,4 +1,5 @@
-import { Outlet } from 'react-router-dom';
+/** The layout of every signed-in page. */
+import { Outlet } from 'react-router';
 import { AssistantLauncher } from '../components/assistant/AssistantLauncher';
 import { StoreHeader } from '../components/StoreHeader';
 import { StoreSidebar } from '../components/StoreSidebar';

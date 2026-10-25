@@ -21,14 +21,21 @@ export default defineConfig({
   test: {
     // List every test file, pass or fail, also when output is not a terminal (AC-1).
     reporters: [['default', { summary: false }]],
-    projects: packages.map((name) => ({
-      extends: true,
-      test: {
-        name,
-        root: join(root, 'packages', name),
-        include: ['src/**/*.test.ts'],
-        environment: 'node',
+    projects: [
+      ...packages.map((name) => ({
+        extends: true,
+        test: {
+          name,
+          root: join(root, 'packages', name),
+          include: ['src/**/*.test.ts'],
+          environment: 'node',
+        },
+      })),
+      // The repo's own tooling, e.g. the JSDoc checker (feature 005).
+      {
+        extends: true,
+        test: { name: 'scripts', root: join(root, 'scripts'), include: ['**/*.test.mjs'], environment: 'node' },
       },
-    })),
+    ],
   },
 });

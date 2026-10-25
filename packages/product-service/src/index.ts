@@ -1,3 +1,4 @@
+/** Product service entry point: the catalog HTTP API on MongoDB, with Redis as a read cache. */
 import express from 'express';
 import mongoose from 'mongoose';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';

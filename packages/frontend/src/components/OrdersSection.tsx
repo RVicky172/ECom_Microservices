@@ -1,3 +1,4 @@
+/** The order history list. */
 import { useGetOrdersQuery } from '../api/storeApi';
 import { cancelReasonLabel, formatCurrency, getStatusClass } from '../utils/storePresentation';
 

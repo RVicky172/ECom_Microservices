@@ -1,3 +1,4 @@
+/** The `/catalog` page. */
 import { CartPanel } from '../components/CartPanel';
 import { ProductCatalog } from '../components/ProductCatalog';
 import { StoreOverview } from '../components/StoreOverview';

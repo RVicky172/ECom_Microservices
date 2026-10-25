@@ -34,8 +34,10 @@ const publishDroppingFailures = async (
   }
 };
 
+/** Publishes one `assistant.interaction`; fire and forget, never rejects. */
 export const publishInteraction = (data: AssistantInteractionData, correlationId: string, log: Logger): Promise<void> =>
   publishDroppingFailures(KafkaTopics.ASSISTANT_INTERACTION, EventTypes.INTERACTION_COMPLETED, 'Interaction', data, correlationId, log);
 
+/** Publishes one `assistant.feedback`; fire and forget, never rejects. */
 export const publishFeedback = (data: AssistantFeedbackData, correlationId: string, log: Logger): Promise<void> =>
   publishDroppingFailures(KafkaTopics.ASSISTANT_FEEDBACK, EventTypes.ANSWER_RATED, 'Feedback', data, correlationId, log);

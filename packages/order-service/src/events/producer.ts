@@ -1,3 +1,4 @@
+/** The order service's Kafka side: the outbox relay that publishes what `createOrder` wrote to `outbox_events`. */
 import { createKafkaClient, createProducer, KafkaTopics } from '@ecommerce/shared';
 import { db } from '../models/orderModel';
 

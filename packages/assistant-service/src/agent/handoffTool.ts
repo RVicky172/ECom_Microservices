@@ -18,6 +18,7 @@ import { defineTool, instrumented, ToolFailure } from './toolTypes';
 /** "HO-" and 8 uppercase hex characters, e.g. HO-1A2B3C4D. */
 const newReference = (): string => `HO-${randomBytes(4).toString('hex').toUpperCase()}`;
 
+/** The `request_human_handoff` tool for one turn, bound to the request's user and conversation. */
 export const buildHandoffTool = (ctx: RequestContext, emit: EmitEvent) =>
   defineTool({
     name: 'request_human_handoff',

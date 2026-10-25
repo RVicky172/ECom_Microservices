@@ -4,6 +4,7 @@
  */
 import type { TokenUsage } from '@ecommerce/shared';
 
+/** The product fields the chat UI shows on a card. */
 export interface ProductCard {
   id: string;
   name: string;
@@ -12,6 +13,7 @@ export interface ProductCard {
   imageUrl?: string;
 }
 
+/** An add-to-cart the assistant suggests. Nothing is added until the shopper confirms it in the UI. */
 export interface CartProposal {
   /** Unique per proposal, so the UI can track which ones were confirmed. */
   id: string;
@@ -20,6 +22,10 @@ export interface CartProposal {
   quantity: number;
 }
 
+/**
+ * One event of a turn's stream: `start`, then any mix of text deltas, tool status, products and proposals, then
+ * `done` or `error`.
+ */
 export type AssistantEvent =
   | { type: 'start'; conversationId: string }
   | { type: 'text'; delta: string }
@@ -32,6 +38,7 @@ export type AssistantEvent =
   | { type: 'done'; conversationId: string; stopReason: string | null; answerId: string; usage: TokenUsage | null }
   | { type: 'error'; code: AssistantErrorCode; message: string };
 
+/** Why a turn ended in an `error` event; the chat controller maps each code to the message shown. */
 export type AssistantErrorCode =
   | 'not_configured'
   | 'rate_limited'

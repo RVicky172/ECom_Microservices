@@ -121,5 +121,30 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   fresh Kafka was dropped. Producer-only topics must be created explicitly (D-027: the assistant does it at startup).
 - Service containers run from the repo root (`WORKDIR /app`), so a script inside one is
   `node packages/<service>/dist/…`, not `node dist/…` (012 T028).
+- Gateway proxy timeouts (005 T002): a stopped service gives a 502 from `on.error` (`ECONNREFUSED`), but a service
+  that accepts the connection and never answers makes http-proxy-middleware close the client socket at
+  `proxyTimeout` with **no** 502 (curl/fetch sees "socket closed"). Same in hpm 3 + Express 4 and hpm 4 + Express 5.
+- `joi.validate(undefined)` on an object schema returns no error and `value: undefined`. Express 5 leaves `req.body`
+  `undefined` when there is no body (it was `{}`), so a body-less POST would pass validation and then crash (005).
+- TypeScript 7 (native) exports only `./unstable/*` from its package, so tools that `require('typescript')`
+  (ts-node, custom AST scripts) don't work on it. Next.js 16.4 does type-check with it (005 T004).
+- ESM-only packages (http-proxy-middleware 4) in a CommonJS TS package: Node 26 `require()`s them, but `tsc` with
+  `module: Node16` fails with TS1479. `"module": "node20"` (root tsconfig) allows it and still emits CommonJS (005).
+- `@types/express` 5 types `req.params` values as `string | string[]`. Type the handler's params
+  (`req: Request<{ id: string }>`); tests then cast to that `Request<…>` type (005 T032).
+- After a React major bump in one workspace, npm can keep the old React hoisted at the root for peer-dependent packages
+  (`react-redux`, `@reduxjs/toolkit`) and nest the new one in the workspace: two Reacts, so hooks break at runtime
+  while `tsc` and the build still pass. Check with `npm ls react --all`; `npm dedupe` fixes it (005 T040).
 - Measuring chat replies: `chat.mjs` prints a multi-line reply; filtering its output with `grep '^reply'` shows
   only the first line and hides text written after a tool call (cost a false "reference missing" in T035).
+- Many source files are CRLF in the working copy. In Git Bash, `sed -i` writes them back as LF, and `grep -c $'\r$'`
+  miscounts them, so count line endings with Node (`/\r\n/g`) instead. Edit files with a tool that keeps the file's
+  line ending (005 T077).
+- Claude Code's Edit tool trims trailing whitespace at the end of `new_string`. An edit whose text ended in
+  `export const x = ` lost the space before `(` on the next line. Don't end an edit's text inside a line (005 T077).
+- Dependabot reads `.github/dependabot.yml` only from the default branch. A pushed branch gets no validation and
+  no check run; after the merge, the "Dependabot Updates" workflow appears with one job per `updates` entry, and a
+  failing entry would show there (005 T072).
+- In an npm-workspaces repo, Dependabot security-update jobs aimed at a workspace folder (`/packages/x`) fail with
+  `dependency_file_not_supported`, because the lockfile is at the root. The `npm` entry on `/` covers the
+  workspaces (005 T072).

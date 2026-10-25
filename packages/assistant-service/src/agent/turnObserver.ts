@@ -6,6 +6,10 @@
 import type { InteractionOutcome } from '@ecommerce/shared';
 import type { AssistantErrorCode, AssistantEvent, EmitEvent } from './events';
 
+/**
+ * Wraps a turn's `emit`: pass every event through `emit`, then read `tools`, the outcome and the error code
+ * when the turn ends.
+ */
 export class TurnObserver {
   private readonly toolNames: string[] = [];
   private sawProposal = false;

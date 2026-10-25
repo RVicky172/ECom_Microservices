@@ -139,6 +139,10 @@ const sumUsage = (turns: TurnRecord[]): TokenUsage | null => {
   return total;
 };
 
+/**
+ * Checks a case's rules (plus the implicit "no handoff" rule) against its recorded turns and returns the result
+ * with every failure.
+ */
 export const grade = (evalCase: EvalCase, turns: TurnRecord[], fixtures: Fixtures): CaseResult => {
   const base = {
     id: evalCase.id,

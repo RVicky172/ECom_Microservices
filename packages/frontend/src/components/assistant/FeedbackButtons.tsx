@@ -1,3 +1,4 @@
+/** Thumbs up and down under an assistant answer (012). */
 import type { AnswerRating } from '../../types/assistant';
 
 interface FeedbackButtonsProps {

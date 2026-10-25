@@ -1,3 +1,7 @@
+/**
+ * Inventory's part of the checkout saga: reserve stock for a new order, then finalize or release it when the
+ * payment outcome arrives. Each event is applied once (idempotent by event ID).
+ */
 import {
   EventTypes,
   KafkaTopics,

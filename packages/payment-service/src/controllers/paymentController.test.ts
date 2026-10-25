@@ -14,7 +14,7 @@ const ORDER_ID = '4eb595bd-36de-4eb6-9ef7-f8da2b9cfe16';
 const call = async (headers: Record<string, string>) => {
   const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
   const next = vi.fn();
-  await getPayment({ headers, params: { orderId: ORDER_ID } } as unknown as Request, res as unknown as Response, next);
+  await getPayment({ headers, params: { orderId: ORDER_ID } } as unknown as Request<{ orderId: string }>, res as unknown as Response, next);
   return { res, next };
 };
 

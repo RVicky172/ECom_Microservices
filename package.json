@@ -29,14 +29,14 @@
   },
   "license": "MIT",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "knex": "^3.3.0",
-    "mongoose": "^9.10.1",
-    "pg": "^8.23.0"
+    "mongoose": "^9.11.4",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   },

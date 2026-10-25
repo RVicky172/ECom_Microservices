@@ -11,14 +11,17 @@ import { redis } from './redis';
 
 const feedbackKey = (userId: string, conversationId: string) => `assistant:feedback:${userId}:${conversationId}`;
 
+/** Stores the user's vote on one answer (the last vote wins) and renews the hash's expiry. */
 export const saveRating = async (userId: string, conversationId: string, answerId: string, rating: AnswerRating): Promise<void> => {
   const key = feedbackKey(userId, conversationId);
   await redis.multi().hset(key, answerId, rating).expire(key, config.conversationTtlSeconds).exec();
 };
 
+/** The conversation's saved votes, `answerId → rating`; `{}` when there are none. */
 export const getRatings = async (userId: string, conversationId: string): Promise<Record<string, AnswerRating>> =>
   (await redis.hgetall(feedbackKey(userId, conversationId))) as Record<string, AnswerRating>;
 
+/** Deletes the conversation's votes (with the conversation). */
 export const deleteRatings = async (userId: string, conversationId: string): Promise<void> => {
   await redis.del(feedbackKey(userId, conversationId));
 };

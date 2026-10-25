@@ -20,6 +20,7 @@ export interface CartProposal {
   quantity: number;
 }
 
+/** Why a chat turn ended with an `error` event. */
 export type AssistantErrorCode =
   | 'not_configured'
   | 'rate_limited'

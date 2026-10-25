@@ -5,6 +5,7 @@
  */
 import type { AssistantInteractionData, InteractionOutcome, TokenUsage } from '@ecommerce/shared';
 
+/** What the chat controller knows about a finished turn; only these fields reach the event. */
 export interface InteractionInput {
   conversationId: string;
   answerId: string;
@@ -19,6 +20,7 @@ export interface InteractionInput {
   endedAt: number;
 }
 
+/** The `assistant.interaction` payload, built field by field (never spread) so nothing extra leaks in. */
 export const buildInteractionEvent = (input: InteractionInput): AssistantInteractionData => ({
   conversationId: input.conversationId,
   answerId: input.answerId,

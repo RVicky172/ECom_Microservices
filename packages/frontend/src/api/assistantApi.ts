@@ -16,6 +16,7 @@ import {
 } from './client';
 import type { AnswerRating, AssistantEvent, AssistantTranscript } from '../types/assistant';
 
+/** The body of `POST /api/v1/assistant/chat`. Omit `conversationId` to start a new conversation. */
 export interface ChatRequest {
   /** Omit to start a new conversation; the server returns its id in the `start` event. */
   conversationId?: string;

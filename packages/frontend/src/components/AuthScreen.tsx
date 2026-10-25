@@ -1,3 +1,4 @@
+/** The sign-in screen's layout and form. */
 import { useState, type FormEvent } from 'react';
 import type { SignInCredentials } from '../hooks/useSession';
 

@@ -4,6 +4,7 @@
  */
 import type { AnswerRating, AssistantFeedbackData, AssistantInteractionData, InteractionOutcome, TokenUsage } from '@ecommerce/shared';
 
+/** One line of the usage report: a UTC day and model's turns, latency, tokens and ratings. */
 export interface UsageRow {
   /** UTC day, `YYYY-MM-DD`, of the turn's completion. */
   day: string;
@@ -23,6 +24,7 @@ export interface UsageRow {
   ratingsDown: number;
 }
 
+/** The usage report's rows, plus the ratings that matched no turn. */
 export interface UsageSummary {
   rows: UsageRow[];
   /** Ratings for answers with no interaction event (dropped, or older than the topic's data). */
@@ -44,6 +46,10 @@ interface Group {
   ratings: AnswerRating[];
 }
 
+/**
+ * Groups turns by day and model (one per answer ID, so duplicates count once) and joins the ratings on
+ * `answerId`.
+ */
 export const aggregateUsage = (interactions: AssistantInteractionData[], feedback: AssistantFeedbackData[]): UsageSummary => {
   // One turn per answer ID, so a duplicated event counts once.
   const byAnswer = new Map<string, AssistantInteractionData>();

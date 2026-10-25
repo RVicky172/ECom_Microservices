@@ -50,7 +50,7 @@ can run in parallel with `[P]`. Every AC is covered by at least one task (AC cov
 
 ## Stage 4 — Implement
 
-Work one task at a time. After each task:
+Work one task at a time, following `specs/coding-standards.md` for new and changed code. After each task:
 
 1. Run `npm run check`. Fix until green.
 2. Tick the task in `tasks.md` and add a short dated **Result** note under it: what was done, what was measured,
@@ -71,6 +71,22 @@ Run every gate in the Definition of Done (`constitution.md`): `npm run check`, `
 
 Stop. Edit `spec.md`, add a line to its **Changelog**, log the decision in `memory/decisions.md`, and re-check
 `plan.md`/`tasks.md` for impact (add tasks if needed) — then write the code. Never silently diverge code from spec.
+
+## Reviewing a Dependabot PR
+
+Dependabot (`.github/dependabot.yml`) opens weekly PRs: one grouped `minor-and-patch` PR per ecosystem, and one PR
+per major. There is no CI yet (D-012), so every PR is checked locally before it is merged:
+
+1. Check it out: `gh pr checkout <number>`.
+2. `npm ci` (for a dashboard PR: `npm --prefix tools/spec-dashboard ci`).
+3. `npm run check` and `npm run build`. For a dashboard PR, also `npm --prefix tools/spec-dashboard run check` and
+   `NODE_ENV=production npx next build` in `tools/spec-dashboard`.
+4. Rebuild the affected images: `docker compose up -d --build <service>` for each package whose `package.json`
+   changed; all of them when `packages/shared` or a Dockerfile base image changed. Then check `/health` on each.
+5. A **major** version: read its release notes or migration guide, try the paths it touches end to end, and add a
+   `memory/decisions.md` entry (what broke, what changed, alternatives). If code has to change, it is a feature:
+   spec it first.
+6. Merge only when every step is green. If one fails, comment the failure on the PR and leave it open.
 
 ## Slash commands (Claude Code)
 

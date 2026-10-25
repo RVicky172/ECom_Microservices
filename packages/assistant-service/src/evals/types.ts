@@ -6,6 +6,7 @@
 import type { TokenUsage } from '@ecommerce/shared';
 import type { AssistantEvent } from '../agent/events';
 
+/** The categories a case can belong to; the report gives a pass rate for each. */
 export const EVAL_CATEGORIES = [
   'discovery',
   'details',
@@ -17,6 +18,7 @@ export const EVAL_CATEGORIES = [
   'injection',
   'offtopic',
 ] as const;
+/** One of `EVAL_CATEGORIES`. */
 export type EvalCategory = (typeof EVAL_CATEGORIES)[number];
 
 /** Rules are checked against the last turn, except `handoff: none`, which covers every turn. */
@@ -27,6 +29,7 @@ export type Rule =
   | { kind: 'proposal'; expect: boolean; product?: string }
   | { kind: 'cartUnchanged' };
 
+/** One scripted conversation and the rules its replies must meet. */
 export interface EvalCase {
   id: string;
   category: EvalCategory | string;
@@ -40,6 +43,7 @@ export interface EvalCase {
 /** Values the runner sets up (orders, products), filled into `{{key}}` placeholders. */
 export type Fixtures = Record<string, string>;
 
+/** What the runner recorded for one turn. */
 export interface TurnRecord {
   events: AssistantEvent[];
   /** The reply text as streamed (all `text` deltas joined). */
@@ -50,6 +54,7 @@ export interface TurnRecord {
   cartAfter?: unknown;
 }
 
+/** One broken rule in a case, with why. */
 export interface CaseFailure {
   /** `null` when the recording itself is wrong (e.g. a missing turn). */
   rule: Rule | null;
@@ -59,6 +64,7 @@ export interface CaseFailure {
   implicit?: true;
 }
 
+/** A graded case. */
 export interface CaseResult {
   id: string;
   category: string;
@@ -70,6 +76,7 @@ export interface CaseResult {
   ms: number;
 }
 
+/** Which run this was: provider, model and time. */
 export interface RunMeta {
   runId: string;
   provider: string;
@@ -79,12 +86,14 @@ export interface RunMeta {
   durationMs: number;
 }
 
+/** Pass count and rate for one category. */
 export interface CategorySummary {
   total: number;
   passed: number;
   rate: number;
 }
 
+/** A whole eval run's results: totals, per-category rates, tokens and every case. */
 export interface Report {
   meta: RunMeta;
   total: number;

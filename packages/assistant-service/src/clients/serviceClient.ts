@@ -1,3 +1,4 @@
+/** HTTP access to the store's internal services, as the current user. */
 import { INTERNAL_TOKEN_HEADER } from '@ecommerce/shared';
 import { config } from '../config';
 import type { RequestContext } from '../context';

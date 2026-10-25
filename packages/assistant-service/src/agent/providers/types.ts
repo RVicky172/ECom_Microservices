@@ -1,3 +1,4 @@
+/** The contract every model provider implements, so the rest of the assistant doesn't depend on one model API. */
 import type { TokenUsage } from '@ecommerce/shared';
 import type { Logger } from 'pino';
 import type { ProviderId } from '../../config';
@@ -10,6 +11,7 @@ export interface TranscriptEntry {
   text: string;
 }
 
+/** Everything a provider needs to run one chat turn. */
 export interface TurnInput {
   /** Earlier messages, in this provider's own message format. */
   history: unknown[];
@@ -20,6 +22,7 @@ export interface TurnInput {
   log: Logger;
 }
 
+/** What a provider returns after a turn. */
 export interface TurnOutput {
   /** Full history after this turn, in this provider's format, ready to store. */
   messages: unknown[];

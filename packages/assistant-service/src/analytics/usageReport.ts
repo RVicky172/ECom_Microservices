@@ -92,6 +92,7 @@ const table = (headers: string[], rows: string[][]): string => {
   return [line(headers), line(widths.map((width) => '-'.repeat(width))), ...rows.map(line)].join('\n');
 };
 
+/** Renders the usage summary as a plain-text table, with the count of unreadable records. */
 export const formatUsage = ({ rows, unmatchedRatings }: UsageSummary, badRecords: number): string => {
   if (rows.length === 0) return 'No assistant usage events found.';
   const main = table(

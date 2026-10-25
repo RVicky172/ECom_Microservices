@@ -1,4 +1,5 @@
-import { useMatches } from 'react-router-dom';
+/** The page header of the signed-in store. */
+import { useMatches } from 'react-router';
 import { useSession } from '../hooks/useSession';
 import type { RouteHandle } from '../routes/paths';
 import { getGreeting } from '../utils/storePresentation';

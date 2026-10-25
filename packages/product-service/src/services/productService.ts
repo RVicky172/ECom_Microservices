@@ -1,3 +1,7 @@
+/**
+ * The catalog: MongoDB reads and writes, with single products cached in Redis (cache-aside). The service keeps
+ * working from the database alone when Redis is down.
+ */
 import Redis from 'ioredis';
 import Product, { IProduct } from '../models/productModel';
 import { NotFoundError } from '@ecommerce/shared';
@@ -69,6 +73,11 @@ export const getAllProducts = async (query: QueryParams = {}): Promise<GetAllPro
   };
 };
 
+/**
+ * One product: from the cache, else from MongoDB (then cached).
+ *
+ * @throws NotFoundError for an unknown ID
+ */
 export const getProductById = async (id: string): Promise<IProduct> => {
   // Check cache first
   try {
@@ -91,11 +100,17 @@ export const getProductById = async (id: string): Promise<IProduct> => {
   return product;
 };
 
+/** Creates a product. */
 export const createProduct = async (data: Partial<IProduct>): Promise<IProduct> => {
   const product = await Product.create(data);
   return product;
 };
 
+/**
+ * Updates a product and drops its cache entry.
+ *
+ * @throws NotFoundError for an unknown ID
+ */
 export const updateProduct = async (id: string, data: Partial<IProduct>): Promise<IProduct> => {
   const product = await Product.findByIdAndUpdate(id, data, { new: true, runValidators: true });
   if (!product) throw new NotFoundError('Product');
@@ -110,6 +125,11 @@ export const updateProduct = async (id: string, data: Partial<IProduct>): Promis
   return product;
 };
 
+/**
+ * Deactivates a product (soft delete) and drops its cache entry.
+ *
+ * @throws NotFoundError for an unknown ID
+ */
 export const deleteProduct = async (id: string): Promise<IProduct> => {
   const product = await Product.findByIdAndUpdate(id, { isActive: false }, { new: true });
   if (!product) throw new NotFoundError('Product');

@@ -1,0 +1,403 @@
+{
+  "id": "005",
+  "folder": "005-dependency-upgrades-code-standards",
+  "title": "Dependency Upgrades, Dependabot, JSDoc and Clean-Code Rules",
+  "phase": 0,
+  "status": "implemented",
+  "stage": "verified",
+  "created": "2026-10-24",
+  "updated": "2026-10-25",
+  "summary": "Upgrade every npm package to its latest stable version with the store's behaviour unchanged, set up Dependabot for version and security updates, document every source file and export with JSDoc (checked by npm run check), and write coding standards with the design patterns this repo uses.",
+  "acceptanceCriteria": [
+    {
+      "id": "AC-1",
+      "text": "npm outdated (root, workspaces, spec dashboard) shows nothing behind latest stable, except agreed and listed exceptions.",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-2",
+      "text": "Deprecated @types/ioredis and @types/uuid removed; no declared library (or its @types) installed in two majors; upstream-pinned transitive duplicates listed, not overridden.",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-3",
+      "text": "npm run check and npm run build pass; unit tests ≥ 237; tests changed for an upgrade listed with reasons.",
+      "test": "unit + manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-4",
+      "text": "Every service image rebuilds from clean; 10/10 health checks healthy.",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-5",
+      "text": "End to end as before: pre-upgrade user signs in, register, products, cart, order CONFIRMED/CANCELLED, assistant turn (ratings checked by 012).",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-6",
+      "text": "Gateway protections unchanged: 401 without JWT, 429 on the 101st request in 15 min, 502 within the timeout with a service stopped, recovery after (no circuit breaker exists; P1).",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-7",
+      "text": "Storefront builds with new React, router and Vite; all 6 pages load with no console errors.",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-8",
+      "text": ".github/dependabot.yml covers npm (root, spec dashboard) and Docker, weekly, grouped minor/patch, majors separate; GitHub shows no config errors.",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-9",
+      "text": "Docs describe reviewing a Dependabot PR locally without CI.",
+      "test": "manual review",
+      "done": true
+    },
+    {
+      "id": "AC-10",
+      "text": "Every non-test source file has a header comment and every export a JSDoc block (today 87/124 files and 151/317 exports lack them; after: 0 and 0).",
+      "test": "manual measurement",
+      "done": true
+    },
+    {
+      "id": "AC-11",
+      "text": "npm run check fails on a missing header or export JSDoc, naming file and line; the checker is unit-tested.",
+      "test": "unit",
+      "done": true
+    },
+    {
+      "id": "AC-12",
+      "text": "Coding-standards doc with patterns and clean-code rules, each with a repo example; referenced by the constitution (version bump), CLAUDE.md and the workflow.",
+      "test": "manual review",
+      "done": true
+    },
+    {
+      "id": "AC-13",
+      "text": "Records updated: tech-stack versions, one decision per major upgrade (D-029 superseded), learnings, roadmap backlog.",
+      "test": "manual review",
+      "done": true
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Record the baseline (outdated, ls, audit, test count, pre-upgrade user)",
+      "done": true,
+      "result": "74 outdated rows (24 packages); audit 2 high, 3 moderate; 237 tests; baseline user registered"
+    },
+    {
+      "id": "T002",
+      "title": "Spike S1: hpm 4, ioredis 6, joi 18, pino 10 from CommonJS and tsx",
+      "done": true,
+      "result": "All load from CommonJS; hpm4+Express5, joi 18, pino 10, ioredis 6 behave identically; proxy.ts unchanged"
+    },
+    {
+      "id": "T003",
+      "title": "Spike S2: bcryptjs 2 and 3 hash compatibility; save a test vector",
+      "done": true,
+      "result": "3.0.3 compares 2.4.3 hashes and back; vector saved"
+    },
+    {
+      "id": "T004",
+      "title": "Spike S3: Next.js build with TypeScript 7",
+      "done": true,
+      "result": "next build type-checks with TS 7; no exception E1"
+    },
+    {
+      "id": "T005",
+      "title": "Spike S4: React 19, react-router 8, Vite 8 storefront build",
+      "done": true,
+      "result": "Builds with only the react-router import rename"
+    },
+    {
+      "id": "T006",
+      "title": "Record uuid 9 v5 vectors",
+      "done": true,
+      "result": "RFC + 3 payment vectors recorded"
+    },
+    {
+      "id": "T007",
+      "title": "Remove unused dependencies",
+      "done": true,
+      "result": "7 unused deps removed; README fixed; 3 images healthy (D-032)"
+    },
+    {
+      "id": "T010",
+      "title": "Step 1: TypeScript 7, @types/node 26, drop ts-node and stubs, dev on tsx",
+      "done": true,
+      "result": "TS 7 + @types/node 26 everywhere, 0 new errors; dev on tsx; 10/10 healthy (D-033)"
+    },
+    {
+      "id": "T020",
+      "title": "Failing tests: shared uuidV5",
+      "done": true,
+      "result": "6 tests incl. RFC and 3 uuid@9 payment vectors; seen failing"
+    },
+    {
+      "id": "T021",
+      "title": "uuidV5 and crypto.randomUUID; remove uuid",
+      "done": true,
+      "result": "randomUUID + shared uuidV5; uuid removed; break check 4/6 fail; 243 tests (D-034)"
+    },
+    {
+      "id": "T022",
+      "title": "joi 18",
+      "done": true,
+      "result": "joi 18 ×5; same 400 bodies live"
+    },
+    {
+      "id": "T023",
+      "title": "pino 10",
+      "done": true,
+      "result": "pino 10; same JSON, correlation IDs logged"
+    },
+    {
+      "id": "T024",
+      "title": "ioredis 6",
+      "done": true,
+      "result": "ioredis 6; cart add/update/remove live"
+    },
+    {
+      "id": "T025",
+      "title": "mongoose 9.11 (product, seed)",
+      "done": true,
+      "result": "mongoose 9.11.4; seed ops checked on a scratch DB (no wipe)"
+    },
+    {
+      "id": "T026",
+      "title": "bcryptjs 3 with old-hash test",
+      "done": true,
+      "result": "3 auth tests incl. 2.4.3 hash; bcryptjs 3; old $2a$ user signs in live (D-036)"
+    },
+    {
+      "id": "T027",
+      "title": "Remaining minors and patches; saga check",
+      "done": true,
+      "result": "pg 8.23.1, Anthropic SDK 1.3; 10/10 healthy; order CONFIRMED in 3 s"
+    },
+    {
+      "id": "T030",
+      "title": "Failing tests: empty body → 400 (bodyOf, controllers)",
+      "done": true,
+      "result": "11 tests pinning the Express 4 empty-body 400s; seen failing"
+    },
+    {
+      "id": "T031",
+      "title": "bodyOf in shared and controllers",
+      "done": true,
+      "result": "bodyOf in shared, 8 call sites; break check 9 fail; 257 tests"
+    },
+    {
+      "id": "T032",
+      "title": "Express 5 and http-proxy-middleware 4",
+      "done": true,
+      "result": "Express 5 + hpm 4; module node20; 13 handlers typed; 257 tests (D-037)"
+    },
+    {
+      "id": "T033",
+      "title": "Gateway checks: 401, 429, 502 and recovery, SSE",
+      "done": true,
+      "result": "401, empty-body 400, 502 + recovery, 429 at 101, SSE headers/events; model reply deferred to T061"
+    },
+    {
+      "id": "T040",
+      "title": "Step 4: React 19, react-router 8, Vite 8",
+      "done": true,
+      "result": "React 19, react-router 8, Vite 8; npm dedupe fixed two Reacts; bundle 711 kB (D-038)"
+    },
+    {
+      "id": "T041",
+      "title": "Storefront: 6 pages, no console errors",
+      "done": true,
+      "result": "User checked all 6 pages, add-to-cart and an assistant turn in a browser: working, no errors"
+    },
+    {
+      "id": "T050",
+      "title": "Step 5: spec dashboard upgrade",
+      "done": true,
+      "result": "next 16.4.3, TS 7.0.2 (no E1), @types/node 26; check 39/39, prod build OK, pages 200 (D-039)"
+    },
+    {
+      "id": "T060",
+      "title": "Clean rebuild, 10/10 health",
+      "done": true,
+      "result": "10 images --no-cache, 11-18 s each (139 s total), 0 vulnerabilities; 10/10 /health 200"
+    },
+    {
+      "id": "T061",
+      "title": "End-to-end store checks",
+      "done": true,
+      "result": "Baseline + new user sign in, products/search, cart, order CONFIRMED and CANCELLED/OUT_OF_STOCK, assistant turn streamed (70 text events)"
+    },
+    {
+      "id": "T062",
+      "title": "Final outdated, ls, audit; exceptions listed",
+      "done": true,
+      "result": "outdated empty after tsx 4.23.15; audit 0 after follow-redirects 1.16.1; no stubs; one major per declared lib (AC-2 narrowed)"
+    },
+    {
+      "id": "T070",
+      "title": ".github/dependabot.yml",
+      "done": true,
+      "result": "dependabot.yml: npm root + dashboard, docker /packages/*; weekly Mon 09:00 IST, minor-and-patch group; schema-valid"
+    },
+    {
+      "id": "T071",
+      "title": "Dependabot PR review checklist in workflow.md",
+      "done": true,
+      "result": "6-step Dependabot PR checklist in specs/workflow.md, linked from README"
+    },
+    {
+      "id": "T072",
+      "title": "Dependabot config shows no errors on GitHub",
+      "done": true,
+      "result": "PR #2 merged; Dependabot ran the 3 configured jobs, all success; alerts 26 -> 0; security updates on"
+    },
+    {
+      "id": "T075",
+      "title": "Failing tests: docCheck",
+      "done": true,
+      "result": "14 checker tests + scripts vitest project; seen failing (8 of 14 vs an empty stub)"
+    },
+    {
+      "id": "T076",
+      "title": "docCheck and check-docs CLI; baseline counts",
+      "done": true,
+      "result": "docCheck.mjs + check-docs CLI; baseline 87/113 headers, 123/266 exports; 17 tests (D-041)"
+    },
+    {
+      "id": "T077",
+      "title": "JSDoc: shared",
+      "done": true,
+      "result": "shared: 10 headers, 27 exports; comments-only verified"
+    },
+    {
+      "id": "T078",
+      "title": "JSDoc: gateway, notification, inventory",
+      "done": true,
+      "result": "gateway, notification, inventory documented; check-docs 0"
+    },
+    {
+      "id": "T079",
+      "title": "JSDoc: auth, cart, order, payment",
+      "done": true,
+      "result": "auth, cart, order, payment documented; check-docs 0"
+    },
+    {
+      "id": "T080",
+      "title": "JSDoc: product, assistant",
+      "done": true,
+      "result": "product, assistant documented; check-docs 0"
+    },
+    {
+      "id": "T081",
+      "title": "JSDoc: frontend",
+      "done": true,
+      "result": "frontend documented; all 113 files, 266 exports; checker names destructured exports"
+    },
+    {
+      "id": "T082",
+      "title": "Doc check as an npm run check gate",
+      "done": true,
+      "result": "check-docs is the 14th check; fails naming file:line when a header is removed; 0/113, 0/266"
+    },
+    {
+      "id": "T085",
+      "title": "specs/coding-standards.md",
+      "done": true,
+      "result": "coding-standards.md: 6 patterns, 8 rules with repo examples; 58 file:line refs verified"
+    },
+    {
+      "id": "T086",
+      "title": "Reference the standards (constitution 1.1.0, CLAUDE.md, workflow, architecture)",
+      "done": true,
+      "result": "constitution 1.1.0 + DoD item 6, CLAUDE.md, workflow, architecture; plus file-size gate (15 checks, D-044)"
+    },
+    {
+      "id": "T087",
+      "title": "Records: tech stack, learnings, backlog, decisions",
+      "done": true,
+      "result": "tech-stack updated, not-used table filled, 6 backlog items, Dependabot learnings, one decision per major"
+    },
+    {
+      "id": "T090",
+      "title": "Update architecture.md",
+      "done": true,
+      "result": "architecture.md: bodyOf, uuidV5, no breaker, 15-check gate; README tech tables corrected"
+    },
+    {
+      "id": "T091",
+      "title": "Definition-of-Done gates",
+      "done": true,
+      "result": "check 15/15, build 0, 283 tests (>= 237), 10/10 /health on rebuilt images; 2 test files changed for the upgrade"
+    },
+    {
+      "id": "T092",
+      "title": "Tick ACs, Implemented, roadmap and memory",
+      "done": true,
+      "result": "13/13 ACs ticked; Implemented; roadmap, progress and memory updated"
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "Q1",
+      "text": "Number and phase: 005 in Phase 0?",
+      "resolved": true
+    },
+    {
+      "id": "Q2",
+      "text": "When relative to 012: pause 012 and do 005 first, on its own branch from main (D-030).",
+      "resolved": true
+    },
+    {
+      "id": "Q3",
+      "text": "Every major to latest with no exceptions except unsupported-on-Node-26/CommonJS ones?",
+      "resolved": true
+    },
+    {
+      "id": "Q4",
+      "text": "Replace ESM-only uuid 14 with crypto.randomUUID?",
+      "resolved": true
+    },
+    {
+      "id": "Q5",
+      "text": "Dependabot settings: weekly, npm + Docker, grouped minor/patch, majors separate, 5 PRs max.",
+      "resolved": true
+    },
+    {
+      "id": "Q6",
+      "text": "Where the Dependabot PR review checklist lives (workflow.md, linked from README).",
+      "resolved": true
+    },
+    {
+      "id": "Q7",
+      "text": "Upgrade in five green steps (tooling, backend libs, Express 5 + gateway, frontend, dashboard)?",
+      "resolved": true
+    },
+    {
+      "id": "Q8",
+      "text": "No ESLint/Prettier in 005; an in-house JSDoc check instead; ESLint to the backlog?",
+      "resolved": true
+    },
+    {
+      "id": "Q9",
+      "text": "Coding rules in specs/coding-standards.md (constitution 1.1.0) and which patterns and rules.",
+      "resolved": true
+    },
+    {
+      "id": "Q10",
+      "text": "Include tools/spec-dashboard?",
+      "resolved": true
+    }
+  ]
+}

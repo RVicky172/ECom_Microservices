@@ -1,3 +1,4 @@
+/** Routes under `/api/v1/assistant`. */
 import { Router } from 'express';
 import * as chatController from '../controllers/chatController';
 
