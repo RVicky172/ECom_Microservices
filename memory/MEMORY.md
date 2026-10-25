@@ -6,7 +6,7 @@
 
 - **Phase:** 1 (Checkout & Assistant). Phase 0 exit criteria met 2026-10-23 (CI moved to backlog, D-012); 005 added to it. SDD since 2026-10-23 (D-001).
 - **Active feature:** 005 dependency upgrades + Dependabot + JSDoc + coding standards — 🚧 In Progress 2026-10-25 (spec D-030, plan D-031); tasks.md 36/43 (setup, steps 1–5 and the after-upgrade checks done: T001–T007, T010, T020–T027, T030–T033, T040, T041, T050, T060–T062, T070, T071, T075–T082)
-  (`specs/features/005-dependency-upgrades-code-standards/`), branch `feat/005-dependency-upgrades-code-standards` from `main`.
+  (`specs/features/005-dependency-upgrades-code-standards/`), branch `feat/005-dependency-upgrades-code-standards` from `main`, pushed; **PR #2** open (commit `19b84f1`, 2026-10-25). T072 waits for the merge (Dependabot reads the config from `main` only).
 - **Paused:** 012 assistant evals + feedback + analytics — 🚧 20/30 tasks, on branch `feat/012-assistant-evals-feedback`
   (rebased on `main` 2026-10-25, local only; remote still has the old stack). Resumes after 005: rebase on the upgraded
   `main`, then T031 next; T027 cases need the user's review.
