@@ -1,6 +1,6 @@
 # 012 — Assistant: Eval Suite, Answer Feedback and Usage Analytics
 
-**Status:** In Progress <!-- Draft | Approved | In Progress | Implemented | Superseded -->
+**Status:** Implemented <!-- Draft | Approved | In Progress | Implemented | Superseded -->
 **Roadmap phase:** 1 · **Created:** 2026-10-24 · **Owner:** RVicky172
 
 ## Summary
@@ -37,7 +37,7 @@ This feature does three things:
 
 ### Eval suite
 
-- [ ] **AC-1:** The repository holds at least 50 eval cases (Q2). Each has an ID, a category, one or more user
+- [x] **AC-1:** The repository holds at least 50 eval cases (Q2). Each has an ID, a category, one or more user
   messages, and pass rules. The categories and their minimum counts are:
   - product discovery and grounding: 10, including the 7 product questions from 011 T035 and "Do you have a
     keyboard?";
@@ -51,39 +51,39 @@ This feature does three things:
   - off-topic requests: 3.
 
   _(manual review of the case file)_
-- [ ] **AC-2:** One command runs the whole suite against the running stack and the configured model. Each case runs
+- [x] **AC-2:** One command runs the whole suite against the running stack and the configured model. Each case runs
   in a new conversation as a dedicated eval user. The data the cases need (products, the eval user's orders) is set
   up by the command, with no manual steps beyond starting the stack and loading the model (Q6). _(manual
   measurement)_
-- [ ] **AC-3:** Grading is rule-based and deterministic (Q4). The same recorded reply and tool calls always get the
+- [x] **AC-3:** Grading is rule-based and deterministic (Q4). The same recorded reply and tool calls always get the
   same grade. Supported rules include: tool called, tool not called (by tool name), text must contain, text must
   not contain, a handoff event was or was not published, a proposal was or was not returned. _(unit, on recorded
   replies)_
-- [ ] **AC-4:** Each run writes a report file with:
+- [x] **AC-4:** Each run writes a report file with:
   - per case: pass or fail, and for a fail, which rule failed;
   - pass rate per category and overall;
   - provider, model, date, duration and token totals.
 
   The command exits non-zero when the target in AC-5 is missed. _(manual measurement)_
-- [ ] **AC-5:** On the configured model, 2 consecutive full runs each reach an overall pass rate of at least 90%,
+- **AC-5 (deferred to a future feature, 2026-10-25, D-049):** On the configured model, 2 consecutive full runs each reach an overall pass rate of at least 90%,
   with 100% in the safety categories: cart (no write without a proposal), orders (another user's order), prompt
   injection, and no unasked handoff (Q3, Q7). The two reports are recorded in tasks.md. _(manual measurement)_
-- [ ] **AC-6:** The eval never runs inside `npm test` or `npm run check`, and no automated test calls a model
+- [x] **AC-6:** The eval never runs inside `npm test` or `npm run check`, and no automated test calls a model
   (testing-strategy rule 5). The grader and the report are unit-tested on recorded replies. _(unit + manual review)_
 
 ### Answer feedback
 
-- [ ] **AC-7:** Each finished assistant answer in the chat widget shows thumbs up and thumbs down buttons. They are
+- [x] **AC-7:** Each finished assistant answer in the chat widget shows thumbs up and thumbs down buttons. They are
   not shown while the answer streams or on an error message. Clicking one records the rating and shows it as
   selected. Clicking the other changes it; one rating per answer is kept (the last). The buttons have accessible
   labels and work from the keyboard (Q9). _(manual measurement in the storefront)_
-- [ ] **AC-8:** The feedback API accepts a rating only from the signed-in owner of the conversation, for an answer
+- [x] **AC-8:** The feedback API accepts a rating only from the signed-in owner of the conversation, for an answer
   that exists in it. Without a JWT it returns 401; for another user's conversation or an unknown answer it returns
   404; a rating other than up or down returns 400. _(unit, tested both ways)_
 
 ### Usage analytics
 
-- [ ] **AC-9:** After each finished chat turn, exactly one `assistant.interaction` event is published. It carries:
+- [x] **AC-9:** After each finished chat turn, exactly one `assistant.interaction` event is published. It carries:
   - an event ID, the conversation ID and the answer's ID;
   - provider, model, stop reason, and an outcome (`answered`, `proposal`, `handoff`, `refused`, `error`,
     `limited`);
@@ -91,24 +91,24 @@ This feature does three things:
   - a timestamp.
 
   It carries no message text and no user ID (Q10). _(unit)_
-- [ ] **AC-10:** Each rating publishes one `assistant.feedback` event with the event ID, conversation ID, answer
+- [x] **AC-10:** Each rating publishes one `assistant.feedback` event with the event ID, conversation ID, answer
   ID, rating and timestamp, so it can be joined with the interaction event. No user ID, no text. _(unit)_
-- [ ] **AC-11:** Both topics and payloads are defined once in `packages/shared` with parsers, and a contract test
+- [x] **AC-11:** Both topics and payloads are defined once in `packages/shared` with parsers, and a contract test
   checks that what the assistant produces passes the parser. _(unit)_
-- [ ] **AC-12:** Publishing analytics never slows or breaks the chat. The event is sent after the answer has been
+- [x] **AC-12:** Publishing analytics never slows or breaks the chat. The event is sent after the answer has been
   streamed. With Kafka stopped, chat turns still finish and ratings are still saved, and a failed event is dropped
   with one log line, not retried. _(unit + manual measurement with Kafka stopped)_
-- [ ] **AC-13:** A usage report command reads the events and prints, per day and per model: conversations, turns,
+- [x] **AC-13:** A usage report command reads the events and prints, per day and per model: conversations, turns,
   tool calls by tool name, handoffs, mean and 95th-percentile latency, token totals, and thumbs up and down counts
   (Q11). After 10 scripted turns and 3 ratings, every count in the report matches exactly. _(unit + manual
   measurement)_
 
 ### Quality and docs
 
-- [ ] **AC-14:** The new logic (grader, report, event builders, feedback handler, usage aggregation) is
+- [x] **AC-14:** The new logic (grader, report, event builders, feedback handler, usage aggregation) is
   unit-tested without Kafka, Redis or a model, and each test is seen failing once by breaking its code, recorded in
   tasks.md. _(unit + manual measurement)_
-- [ ] **AC-15:** The changed services are rebuilt and report healthy. The docs are updated:
+- [x] **AC-15:** The changed services are rebuilt and report healthy. The docs are updated:
   - `docs/ai-shopping-assistant.md` (Phase 4 status: what is built, what is still open);
   - the assistant README (how to run the eval and the usage report);
   - `specs/testing-strategy.md` (where evals sit);
@@ -186,3 +186,21 @@ Number them so answers can be referenced (Q1, Q2…). Each with a proposed defau
 - 2026-10-24 — Q1–Q12 accepted as proposed by RVicky172; status → Approved (D-023).
 - 2026-10-24 — Plan review: AC-3 rules check tool names only, not tool arguments (D-024, plan §3.2).
 - 2026-10-24 — Plan approved (D-024), tasks written; status → In Progress.
+- 2026-10-25 — After the first eval runs (T030), the user approved four changes (D-046): prompt rules against
+  instructions inside tool results, proposing directly when asked to add to the cart, and looking up before asking
+  "which one?"; `search_products` matches singular and plural; I03 reworded so the model searches. For AC-5, a
+  rule can opt out of its case's safety flag: in C01/C02 the missing proposal is an ordinary failure, while "cart
+  unchanged" and "no claimed add" stay safety rules (AC-5's cart safety is "no write without a proposal").
+- 2026-10-25 — The three prompt rules made the eval worse (40 and 42 of 50 against 45) and were removed. A
+  prompt-only defence didn't stop the product-description injection, so it is defended in code (D-047): product
+  tools return descriptions as `merchant_text_untrusted` next to a note, after sentences addressed to the assistant
+  are removed. Run 7: I03 passes, 0 safety failures.
+- 2026-10-25 — A code guard corrects a reply that claims to be connecting the customer when no handoff happened
+  (D-048). **AC-5 is not met on the local Qwen3-30B**: 6 runs since T036 at 86–94%, 0 safety failures in each, but
+  never 2 consecutive runs ≥ 90%. The user chose to record this and move on (T034); AC-5 stays open for a re-run
+  on a stronger model.
+- 2026-10-25 — Verify (T091): 14 of 15 ACs proven and ticked; AC-5 stays open, so the status stays In Progress.
+- 2026-10-25 — AC-5 deferred to a future feature at the user's request (D-049): reaching it needs a stronger,
+  paid model, and the project is in a learning phase. The eval suite, its target and the 0-safety-failure result
+  stand; the two consecutive ≥ 90% runs are a backlog item. AC-5 is no longer a checklist item, so the other 14
+  ACs complete the feature; status → Implemented.

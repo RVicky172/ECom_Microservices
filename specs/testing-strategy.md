@@ -7,9 +7,15 @@
 | Typecheck | `tsc --noEmit` | every `packages/*` (test files included) | Types and compile errors in all packages | `npm run check` |
 | Unit | Vitest 5 (root `vitest.config.mts`, one project per package) | `packages/*/src/**/*.test.ts`, next to the code | Pure logic: services, validators, tool functions, reducers | `npm test` (also run by `npm run check`) |
 | Integration (manual today) | Docker Compose + curl / scripts | running stack | Gateway routing, auth, cross-service calls, SSE | `docker compose up -d --build`, then the checks the feature's tasks record |
+| Assistant evals (manual, live model) | `src/evals/run.ts` in the assistant package (feature 012) | running stack + the configured model | The assistant's behaviour: tool use, grounded answers, policies, handoffs, cart safety, prompt injection, off-topic. 50 scripted cases with rule-based grading; target ≥ 90% and no safety failure | `npm run eval` (writes `packages/assistant-service/eval-reports/`) |
 
-The gate (`npm run check`) runs the typecheck and the unit tests; integration checks stay manual and are recorded
-as evidence in each feature's tasks.
+The gate (`npm run check`) runs the typecheck, the unit tests and the doc and size checks; integration checks and
+evals stay manual and are recorded as evidence in each feature's tasks.
+
+**When to run the evals:** before merging any change to the assistant's system prompt, tools, provider, model or
+model settings. The local model's results vary by a few cases between identical runs, so judge a change on at
+least two runs against two runs without it. The grader, report and case file are unit-tested on recorded replies
+(`src/evals/*.test.ts`); the eval itself never runs in `npm test` or `npm run check`.
 
 ### Writing a unit test
 
@@ -62,9 +68,10 @@ as evidence in each feature's tasks.
 ## Commands
 
 ```bash
-npm run check  # fast gate — typecheck + unit tests (+ spec dashboard); must pass before any task is ticked
+npm run check  # fast gate — typecheck + unit tests + JSDoc + file size (+ spec dashboard); must pass before any task is ticked
 npm test       # unit tests in packages/ (Vitest)
 npx vitest run --project shared   # one package
 npx vitest                        # watch mode
 npm run build  # production build
+npm run eval   # assistant evals against the running stack and model (manual, not part of the gate)
 ```

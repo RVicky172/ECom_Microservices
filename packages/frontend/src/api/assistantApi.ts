@@ -14,7 +14,7 @@ import {
   getAccessToken,
   refreshAccessToken,
 } from './client';
-import type { AssistantEvent } from '../types/assistant';
+import type { AnswerRating, AssistantEvent, AssistantTranscript } from '../types/assistant';
 
 /** The body of `POST /api/v1/assistant/chat`. Omit `conversationId` to start a new conversation. */
 export interface ChatRequest {
@@ -93,14 +93,15 @@ const readEventStream = async (
   }
 };
 
-/** A stored conversation as user/assistant text, for restoring the panel after a reload. */
-export const fetchConversation = async (
-  conversationId: string,
-): Promise<Array<{ role: 'user' | 'assistant'; text: string }>> => {
-  const { data } = await api.get<{ messages: Array<{ role: 'user' | 'assistant'; text: string }> }>(
-    `/api/v1/assistant/conversations/${conversationId}`,
-  );
-  return data.messages;
+/** A stored conversation as user/assistant text with answer IDs and ratings, for restoring the panel after a reload. */
+export const fetchConversation = async (conversationId: string): Promise<AssistantTranscript> => {
+  const { data } = await api.get<AssistantTranscript>(`/api/v1/assistant/conversations/${conversationId}`);
+  return data;
+};
+
+/** Rate one answer up or down; the last rating counts (012). Uses the Axios client's token refresh. */
+export const rateAnswer = async (conversationId: string, answerId: string, rating: AnswerRating): Promise<void> => {
+  await api.put(`/api/v1/assistant/conversations/${conversationId}/answers/${answerId}/feedback`, { rating });
 };
 
 /** Delete a conversation's history on the server. */

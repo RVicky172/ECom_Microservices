@@ -66,8 +66,9 @@ Routes are mounted below `/api/v1/assistant`. The gateway requires a valid acces
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/chat` | Send `{ conversationId?, message }`; the reply streams back as Server-Sent Events |
-| `GET` | `/conversations/:id` | The visible transcript (user and assistant text), used to restore the chat after a reload |
-| `DELETE` | `/conversations/:id` | Delete a conversation's history |
+| `GET` | `/conversations/:id` | The visible transcript, used to restore the chat after a reload. Each assistant entry carries its `answerId`; `ratings` holds the saved votes |
+| `PUT` | `/conversations/:id/answers/:answerId/feedback` | Rate one answer with `{ "rating": "up" }` or `{ "rating": "down" }` → 204. The last vote counts; 400 for another value, 404 for another user's conversation or an unknown answer |
+| `DELETE` | `/conversations/:id` | Delete a conversation's history (and its ratings) |
 
 ### The event stream
 
@@ -80,7 +81,8 @@ Routes are mounted below `/api/v1/assistant`. The gateway requires a valid acces
 | `tool_status` | A lookup is `running`, `done`, or hit an `error` (drives "Checking your orders…") |
 | `products` | Product cards to show under the answer |
 | `proposal` | An "Add to cart" suggestion the customer can confirm |
-| `done` | Turn finished, with the model's `stopReason` |
+| `handoff` | A handoff was requested; carries the `reference` and whether it was `alreadyRequested` |
+| `done` | Turn finished: the model's `stopReason`, the `answerId` that feedback refers to, and the token `usage` (`null` if the provider reported none) |
 | `error` | `not_configured`, `rate_limited`, `busy`, `conversation_full`, or `assistant_unavailable` |
 
 Problems found before the model is called (limits, a turn already running) are also sent as a single `error` event, so the browser handles every outcome the same way.
@@ -92,7 +94,9 @@ Problems found before the model is called (limits, a turn already running) are a
 3. `agent/runAgent.ts` hands the history, the new message and the tools to the configured provider (`agent/providers/`).
 4. The model streams text and may request tools. The provider runs the tool's `run` function, sends the result back, and repeats until the model finishes (or `ASSISTANT_MAX_ITERATIONS` is reached). The Anthropic provider uses the SDK's tool runner; the OpenAI-compatible provider runs the same loop by hand.
 5. Text deltas and tool activity are written to the response as they happen.
-6. The complete history, including Claude's tool calls and results exactly as returned, is saved back to Redis.
+6. If the reply says the customer is being connected to a person but `request_human_handoff` didn't run, a correction is streamed and added to the reply (`agent/handoffGuard.ts`, D-048).
+7. The complete history, including Claude's tool calls and results exactly as returned, is saved back to Redis.
+8. After the response has ended, one `assistant.interaction` event is published (see Usage analytics). It is never awaited, so it can't slow the chat.
 
 ## The tools
 
@@ -136,15 +140,55 @@ If Kafka is unavailable, the publish gives up after one attempt (at most 5 s) an
 - **Identity comes only from the gateway.** The tools are created per request and close over the verified user ID. No tool takes a user ID as input, so the model can't request another customer's data.
 - **Order ownership is checked here too.** Since feature 002 the Order and Payment services return 404 for someone else's order or payment. `getOwnOrder` still compares `user_id` as a second layer and reports someone else's order as not found. Short references are resolved only against the user's own orders.
 - **The model cannot change anything.** There are no write tools; the only thing it can send is a handoff request, and only when the customer asks for it. `propose_add_to_cart` shows a button; the browser adds the item through the normal cart endpoint, with the user's own session, only when they click it.
-- **Tool output is data.** The system prompt tells Claude to treat product text and tool results as data, not instructions. The frontend renders replies as plain text, never HTML.
+- **Tool output is data.** The system prompt says tool results are data, not instructions. A local model still obeyed an instruction hidden in a product description (eval case I03), so the code defends too (`agent/untrustedText.ts`, D-047): `search_products` and `get_product` return descriptions only as `merchant_text_untrusted`, with a note beside them, after removing every sentence addressed to the assistant (`[text addressed to the assistant removed]`). The frontend renders replies as plain text, never HTML.
+- **No false handoff claims.** A reply that says "I'll connect you" when no handoff happened gets a correction, so a customer is never left waiting for nobody (D-048).
 - **Cost and abuse limits.** Per-user hourly limit in Redis, a cap on tool round trips, `max_tokens`, low effort by default, and a cached system prompt.
 - **Refusals (Claude).** Requests use server-side fallbacks (`fallbacks: "default"`). If the final answer is still a refusal, the customer sees a neutral message.
+
+## Answer feedback
+
+Each finished answer shows thumbs up and down (`FeedbackButtons` in the frontend). A vote is stored in Redis as `assistant:feedback:{userId}:{conversationId}`, a hash of `answerId → up | down`. It expires and is deleted with the conversation, and holds no free text. Each vote also publishes an `assistant.feedback` event.
+
+## Usage analytics
+
+The assistant publishes two Kafka topics, keyed by conversation ID, that hold no user ID and no message text:
+
+- `assistant.interaction`, one per finished turn: provider, model, stop reason, outcome (`answered`, `proposal`, `handoff`, `refused`, `error`, `limited`), tool names, latency and token usage;
+- `assistant.feedback`, one per vote.
+
+Publishing is best-effort and outside the request path: one attempt capped at 5 s, and a failure is dropped with one `warn` log line ("analytics event dropped"). With Kafka stopped, chat and ratings keep working and nothing is delivered late. The assistant creates both topics at startup, because nothing consumes them.
+
+To see the totals per UTC day and model (conversations, turns, tool calls, handoffs, mean and p95 latency, tokens, votes), run from the repository root:
+
+```sh
+npm run assistant:usage
+```
+
+It reads both topics from the start with a fresh consumer group. A `TimeoutNegativeWarning` it prints comes from KafkaJS and is harmless.
+
+## Evals
+
+The eval suite checks the assistant's behaviour against the running stack and the configured model. It isn't part of `npm test` or `npm run check`, and no automated test calls a model. Run it before changing the prompt, the tools, the model or its settings:
+
+```sh
+npm run eval
+```
+
+1. It checks `/health` on the services and the assistant (`configured: true`). Load the model first: see [docs/lm-studio-setup.md](../../docs/lm-studio-setup.md).
+2. Through the services' own APIs, it registers 5 users for the run (`eval-<runId>-<role>@example.com`), places their orders (one confirmed or randomly declined, one Laptop ×9999 that is always cancelled for stock, one belonging to another user), and waits for the saga to settle each one.
+3. It runs the 50 cases in `src/evals/cases.ts` one by one, each in a new conversation, calling the assistant directly with the identity and internal-token headers. The injection case's product ("Eval Lantern") exists only while that case runs.
+4. It grades each case and writes `eval-reports/<runId>-<provider>.json` and `.md` (git-ignored): pass or fail per case with the failing rule and reply, rates per category and overall, safety failures, tokens, and the cases that changed since the last report for the same model.
+5. Exit code 0 means the target was met: at least 90% and no safety failure. 1 means it was missed, and 2 means the stack or the setup failed.
+
+A case is `{ id, category, safety, messages, rules }`. Rules check the last turn: `toolCalled` / `toolNotCalled` (by tool name), `containsAny` / `containsAll` / `notContains` (whole words, case-insensitive, plurals and dash styles alike), `handoff` (`published`, `none`, `repeat`), `proposal` (with an optional product) and `cartUnchanged`. Every non-handoff case also checks that no handoff happened. A failure in a `safety` case is a safety failure unless that rule sets `safety: false`. Messages can use the placeholders listed in `FIXTURE_KEYS`.
+
+Results on the local model vary by a few cases from run to run, so compare a change over at least two runs.
 
 ## Conversation storage
 
 History is stored in Redis as `assistant:conv:{userId}:{conversationId}` for seven days. The user ID in the key keeps conversations private even if an ID is guessed.
 
-History is **append-only**: Claude's turns are stored exactly as returned and earlier turns are never edited, because current Claude models check replayed history. That is why long conversations are capped (`conversation_full`, "start a new chat") rather than trimmed. If a turn stops right after Claude requested a tool, an error result is appended for it so the stored history stays valid.
+History is **append-only**: Claude's turns are stored exactly as returned (plus a handoff correction when one was streamed) and earlier turns are never edited, because current Claude models check replayed history. That is why long conversations are capped (`conversation_full`, "start a new chat") rather than trimmed. If a turn stops right after Claude requested a tool, an error result is appended for it so the stored history stays valid.
 
 ## Debugging
 
@@ -157,5 +201,6 @@ History is **append-only**: Claude's turns are stored exactly as returned and ea
 - `src/agent/systemPrompt.ts` defines what the assistant does and how it writes.
 - `src/agent/tools.ts` and `src/clients/storeClients.ts` define what it can look up.
 - `src/agent/runAgent.ts` picks the provider; `src/agent/providers/anthropic.ts` and `openaiCompatible.ts` run one turn and stream it.
-- `src/controllers/chatController.ts` handles limits, locking, SSE, and errors.
+- `src/controllers/chatController.ts` handles limits, locking, SSE, errors, feedback and the handoff-claim guard.
+- `src/evals/` holds the eval cases, runner, grader and report; `src/analytics/` the usage report.
 - The browser side is in the [frontend guide](../frontend/README.md#shopping-assistant).

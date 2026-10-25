@@ -1,4 +1,5 @@
 /** The contract every model provider implements, so the rest of the assistant doesn't depend on one model API. */
+import type { TokenUsage } from '@ecommerce/shared';
 import type { Logger } from 'pino';
 import type { ProviderId } from '../../config';
 import type { EmitEvent } from '../events';
@@ -26,6 +27,10 @@ export interface TurnOutput {
   /** Full history after this turn, in this provider's format, ready to store. */
   messages: unknown[];
   stopReason: string | null;
+  /** The model that answered (for LM Studio, the resolved loaded model). */
+  model: string;
+  /** Summed over every model call in the turn; `null` when the provider reported none (D-025). */
+  usage: TokenUsage | null;
 }
 
 /**
@@ -41,7 +46,22 @@ export interface AssistantProvider {
   runTurn(input: TurnInput): Promise<TurnOutput>;
   /** User-visible text only: no tool calls, tool results or reasoning. */
   toTranscript(messages: unknown[]): TranscriptEntry[];
+  /**
+   * A copy of the history with `text` added to the turn's last reply, so a correction streamed after the model
+   * finished is stored too (D-048). The input array is not changed.
+   */
+  appendReply(messages: unknown[], text: string): unknown[];
 }
+
+/** Adds one model call's usage to the turn's total, which stays `null` until a call reports some. */
+export const addUsage = (total: TokenUsage | null, call: TokenUsage): TokenUsage => {
+  if (!total) return { ...call };
+  return {
+    inputTokens: total.inputTokens + call.inputTokens,
+    cachedInputTokens: total.cachedInputTokens + call.cachedInputTokens,
+    outputTokens: total.outputTokens + call.outputTokens,
+  };
+};
 
 /** Appends consecutive assistant text to one bubble, since one turn may span several model calls. */
 export const pushTranscriptEntry = (entries: TranscriptEntry[], role: TranscriptEntry['role'], text: string): void => {

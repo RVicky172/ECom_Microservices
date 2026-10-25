@@ -2,6 +2,7 @@
  * Events streamed to the browser as Server-Sent Events during one chat turn.
  * Mirrored in `packages/frontend/src/types/assistant.ts`; keep them in sync.
  */
+import type { TokenUsage } from '@ecommerce/shared';
 
 /** The product fields the chat UI shows on a card. */
 export interface ProductCard {
@@ -31,7 +32,10 @@ export type AssistantEvent =
   | { type: 'tool_status'; tool: string; state: 'running' | 'done' | 'error' }
   | { type: 'products'; items: ProductCard[] }
   | { type: 'proposal'; proposal: CartProposal }
-  | { type: 'done'; conversationId: string; stopReason: string | null }
+  /** After support was told (or a repeat found the earlier request). The eval grades with it; the UI ignores it (012). */
+  | { type: 'handoff'; reference: string; alreadyRequested: boolean }
+  /** `answerId` identifies this answer for feedback; `usage` is the turn's token count, `null` if unreported (012). */
+  | { type: 'done'; conversationId: string; stopReason: string | null; answerId: string; usage: TokenUsage | null }
   | { type: 'error'; code: AssistantErrorCode; message: string };
 
 /** Why a turn ended in an `error` event; the chat controller maps each code to the message shown. */

@@ -80,7 +80,7 @@ export function AssistantPanel({ chat, onClose }: AssistantPanelProps): React.JS
             ))}
           </div>
         )}
-        {items.map((item) => <AssistantMessage key={item.id} item={item} />)}
+        {items.map((item) => <AssistantMessage key={item.id} item={item} onRate={(rated, rating) => void chat.rate(rated, rating)} />)}
       </div>
 
       <form className="assistant-form" onSubmit={handleSubmit}>

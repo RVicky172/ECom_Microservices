@@ -1,6 +1,7 @@
 /** A message bubble in the assistant chat. */
-import type { ChatItem } from '../../types/assistant';
+import type { AnswerRating, ChatItem } from '../../types/assistant';
 import { formatCurrency } from '../../utils/storePresentation';
+import { FeedbackButtons } from './FeedbackButtons';
 import { ProposalButton } from './ProposalButton';
 
 /**
@@ -12,6 +13,7 @@ const renderInline = (text: string): React.ReactNode[] =>
 
 interface AssistantMessageProps {
   item: ChatItem;
+  onRate?: (item: ChatItem, rating: AnswerRating) => void;
 }
 
 /**
@@ -19,9 +21,11 @@ interface AssistantMessageProps {
  * product cards and "Add to cart" suggestions. Text is rendered as plain text
  * (never as HTML), so model output can't inject markup.
  */
-export function AssistantMessage({ item }: AssistantMessageProps): React.JSX.Element {
+export function AssistantMessage({ item, onRate }: AssistantMessageProps): React.JSX.Element {
   const isUser = item.role === 'user';
   const isEmpty = !item.text && !item.activity && !item.error && item.products.length === 0;
+  // `answerId` arrives with `done`, so the buttons never show while streaming (012).
+  const canRate = !isUser && Boolean(item.answerId) && !item.error && Boolean(onRate);
 
   return (
     <div className={`assistant-message ${isUser ? 'from-user' : 'from-assistant'}`}>
@@ -44,6 +48,8 @@ export function AssistantMessage({ item }: AssistantMessageProps): React.JSX.Ele
       {item.proposals.map((proposal) => <ProposalButton key={proposal.id} proposal={proposal} />)}
 
       {item.error && <p className="assistant-error" role="alert">{item.error.message}</p>}
+
+      {canRate && <FeedbackButtons rating={item.rating} onRate={(rating) => onRate!(item, rating)} />}
     </div>
   );
 }

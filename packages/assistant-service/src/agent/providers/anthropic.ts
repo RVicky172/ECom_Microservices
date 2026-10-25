@@ -5,13 +5,14 @@
  * them, and never edited (current Claude models check replayed history).
  */
 import Anthropic from '@anthropic-ai/sdk';
+import type { TokenUsage } from '@ecommerce/shared';
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { ToolError } from '@anthropic-ai/sdk/lib/tools/ToolError';
 import type { BetaMessageParam, BetaTextBlockParam } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { config } from '../../config';
 import { SYSTEM_PROMPT } from '../systemPrompt';
 import { ToolFailure, type AssistantTool } from '../toolTypes';
-import { pushTranscriptEntry, type AssistantProvider, type TranscriptEntry, type TurnInput, type TurnOutput } from './types';
+import { addUsage, pushTranscriptEntry, type AssistantProvider, type TranscriptEntry, type TurnInput, type TurnOutput } from './types';
 
 let client: Anthropic | undefined;
 
@@ -81,6 +82,8 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
 
   // Separate text from successive model turns (before and after tool calls).
   let hasWrittenText = false;
+  let usage: TokenUsage | null = null;
+  let model = config.model;
   for await (const stream of runner) {
     for await (const event of stream) {
       if (event.type === 'content_block_start' && event.content_block.type === 'text' && hasWrittenText) {
@@ -105,6 +108,13 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
       },
       'assistant model call',
     );
+    model = message.model;
+    // Cache writes count as input; cache reads are the cached part (D-025).
+    usage = addUsage(usage, {
+      inputTokens: message.usage.input_tokens + (message.usage.cache_creation_input_tokens ?? 0),
+      cachedInputTokens: message.usage.cache_read_input_tokens ?? 0,
+      outputTokens: message.usage.output_tokens,
+    });
   }
 
   const final = await runner.done();
@@ -115,7 +125,18 @@ const runTurn = async ({ history, userMessage, tools, emit, signal, log }: TurnI
     emit({ type: 'text', delta: `${hasWrittenText ? '\n\n' : ''}I couldn't finish that one. Could you ask in a simpler way?` });
   }
 
-  return { messages: closeDanglingToolUse([...runner.params.messages]), stopReason: final.stop_reason };
+  return { messages: closeDanglingToolUse([...runner.params.messages]), stopReason: final.stop_reason, model, usage };
+};
+
+/** Adds a text block to the last assistant message, or adds an assistant message when the last one is the user's. */
+const appendReply = (messages: unknown[], text: string): unknown[] => {
+  const last = messages.at(-1) as BetaMessageParam | undefined;
+  const block: BetaTextBlockParam = { type: 'text', text };
+  if (last?.role === 'assistant') {
+    const content = typeof last.content === 'string' ? [{ type: 'text' as const, text: last.content }] : last.content;
+    return [...messages.slice(0, -1), { ...last, content: [...content, block] }];
+  }
+  return [...messages, { role: 'assistant', content: [block] }];
 };
 
 const toTranscript = (messages: unknown[]): TranscriptEntry[] => {
@@ -141,4 +162,5 @@ export const anthropicProvider: AssistantProvider = {
   isConfigured: () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN),
   runTurn,
   toTranscript,
+  appendReply,
 };

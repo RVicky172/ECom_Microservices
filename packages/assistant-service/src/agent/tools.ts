@@ -11,6 +11,8 @@ import { z } from 'zod';
 import * as store from '../clients/storeClients';
 import type { RequestContext } from '../context';
 import type { EmitEvent, ProductCard } from './events';
+import { searchCatalog } from './catalogSearch';
+import { merchantText, UNTRUSTED_TEXT_NOTE } from './untrustedText';
 import { buildHandoffTool } from './handoffTool';
 import { defineTool, instrumented, ToolFailure, type AssistantTool } from './toolTypes';
 
@@ -36,9 +38,6 @@ const availability = (stock: store.StockLevel | null): string => {
   return 'in_stock';
 };
 
-/** Lower-case words of 2+ characters, used for simple keyword matching. */
-const keywords = (text: string): string[] => text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 1);
-
 /** Creates the tool set for one request. */
 export const buildTools = (ctx: RequestContext, emit: EmitEvent): AssistantTool<any>[] => [
   defineTool({
@@ -53,29 +52,19 @@ export const buildTools = (ctx: RequestContext, emit: EmitEvent): AssistantTool<
       max_price: z.number().positive().optional().describe('Only products at or below this price, in dollars.'),
     }),
     run: instrumented('search_products', emit, async ({ query, category, max_price }) => {
-      const words = keywords(query ?? '');
-      const scored = (await store.listProducts(ctx))
-        .filter((p) => !category || p.category?.toLowerCase() === category.toLowerCase())
-        .filter((p) => max_price === undefined || Number(p.price) <= max_price)
-        .map((p) => {
-          const haystack = `${p.name} ${p.description} ${p.category ?? ''}`.toLowerCase();
-          return { product: p, score: words.filter((word) => haystack.includes(word)).length };
-        })
-        .filter(({ score }) => words.length === 0 || score > 0)
-        .sort((a, b) => b.score - a.score);
-
-      const products = scored.map(({ product }) => product);
+      const products = searchCatalog(await store.listProducts(ctx), { query, category, max_price });
       if (products.length > 0) {
         emit({ type: 'products', items: products.slice(0, MAX_PRODUCT_CARDS).map(toCard) });
       }
       return {
         count: products.length,
+        untrusted_text_note: UNTRUSTED_TEXT_NOTE,
         products: products.slice(0, 20).map((p) => ({
           product_id: p._id,
           name: p.name,
           price: Number(p.price),
           category: p.category,
-          description: p.description.slice(0, 300),
+          ...merchantText(p.description.slice(0, 300)),
         })),
       };
     }),
@@ -88,7 +77,14 @@ export const buildTools = (ctx: RequestContext, emit: EmitEvent): AssistantTool<
     run: instrumented('get_product', emit, async ({ product_id }) => {
       const p = await store.getProduct(ctx, product_id).catch(() => null);
       if (!p) throw new ToolFailure(`No product with id ${product_id}.`);
-      return { product_id: p._id, name: p.name, price: Number(p.price), category: p.category, description: p.description };
+      return {
+        product_id: p._id,
+        name: p.name,
+        price: Number(p.price),
+        category: p.category,
+        ...merchantText(p.description),
+        untrusted_text_note: UNTRUSTED_TEXT_NOTE,
+      };
     }),
   }),
 

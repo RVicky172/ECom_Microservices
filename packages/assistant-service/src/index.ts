@@ -2,6 +2,7 @@
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import { isConfigured, provider } from './agent/runAgent';
+import { ensureAnalyticsTopics } from './clients/analyticsTopics';
 import { config } from './config';
 import chatRoutes from './routes/chatRoutes';
 
@@ -46,4 +47,5 @@ app.listen(config.port, () => {
     { port: config.port, provider: provider.id, model: provider.describeModel(), configured: isConfigured() },
     'Assistant Service started',
   );
+  void ensureAnalyticsTopics({ logger }); // background; chat works without Kafka (012, D-027)
 });

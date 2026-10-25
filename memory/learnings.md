@@ -33,6 +33,10 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   cover it; offer a person" plus an example sentence fixed that, but then "card payments only" was read as silent
   about PayPal. At temperature 0.3 the answers are near-deterministic, so one run per prompt shows the effect.
 
+- Scripts calling services directly: paths are `/api/v1/<service>/…` on each port, auth's Joi `email()` rejects
+  reserved TLDs such as `@example.test` (use `@example.com`), and product `DELETE` is a soft delete
+  (`isActive: false`; still readable by ID) (012 T002).
+
 ## Tests & build
 
 - Vitest config at the root must be `vitest.config.mts`: the repo is CommonJS (no `"type": "module"`), and a `.ts`
@@ -44,9 +48,10 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   (fixed 2026-10-23).
 - Vitest's default reporter lists passing files only in a terminal; `reporters: [['default', { summary: false }]]`
   lists every file in piped output too (scripts/check.mjs, CI).
-- `@ecommerce/shared` emits no `.d.ts` (no `declaration` in tsconfig), so services resolve it to `dist/index.js` and
-  see its exports as untyped; their typecheck also needs shared built first. Unit tests avoid this via the Vitest
-  alias to `packages/shared/src`. (Found 2026-10-23 in 001; not fixed — backlog candidate, matters for CI 003.)
+- `@ecommerce/shared` emits `.d.ts` since 2026-10-24 (D-029); services resolve it to `dist/`, so their typecheck needs
+  shared built first (unit tests use the Vitest alias to `packages/shared/src`). Types a `.d.ts` imports (e.g.
+  `express`) resolve from the package that holds it: a hoisted root `@types/express` 5 made shared's middleware types
+  clash with the services' v4 copies (21 errors) until shared got its own v4 types. Keep one `@types/express` major.
 - Don't generate "allowed" test cases from the table under test (`it.each(Object.entries(TABLE)…)`): deleting an
   entry deletes its test and nothing fails. Write the expected cases out (001 T013, order transitions).
 - Adding `vitest` 5 to the root `devDependencies` breaks every `node:20-alpine` image build: npm 10.8.2 crashes
@@ -107,6 +112,15 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   imperative "call the tool straight away, before writing anything" for handoffs made it skip `search_products`
   and invent branded products; scoping the rule to handoffs plus an explicit "look up before naming any product"
   rule with a vague-question example fixed it (D-022). Re-check product grounding after any prompt change.
+- LM Studio streams usage only when asked (`stream_options: { include_usage: true }`): one extra last chunk with
+  `choices: []` (empty, not absent) and `usage` (`prompt_tokens`, `completion_tokens`), never a cached-token count
+  (012 T001). Code that does `const choice = chunk.choices[0]; if (!choice) continue` skips it.
+- Kafka auto-creates a topic on the first producer metadata request, but the new partition has no leader for a
+  moment; a producer with `retries: 0` (D-021) then fails with "This server does not host this topic-partition".
+  Topics nobody consumes (012 analytics) are never pre-created by `startSagaConsumer`, so the first event on a
+  fresh Kafka was dropped. Producer-only topics must be created explicitly (D-027: the assistant does it at startup).
+- Service containers run from the repo root (`WORKDIR /app`), so a script inside one is
+  `node packages/<service>/dist/…`, not `node dist/…` (012 T028).
 - Gateway proxy timeouts (005 T002): a stopped service gives a 502 from `on.error` (`ECONNREFUSED`), but a service
   that accepts the connection and never answers makes http-proxy-middleware close the client socket at
   `proxyTimeout` with **no** 502 (curl/fetch sees "socket closed"). Same in hpm 3 + Express 4 and hpm 4 + Express 5.
@@ -134,3 +148,16 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
 - In an npm-workspaces repo, Dependabot security-update jobs aimed at a workspace folder (`/packages/x`) fail with
   `dependency_file_not_supported`, because the lockfile is at the root. The `npm` entry on `/` covers the
   workspaces (005 T072).
+- The usage report (and any KafkaJS client) prints `TimeoutNegativeWarning: -17929… is a negative number` on Node 26.
+  It comes from KafkaJS 2.2.4's `RequestQueue.scheduleCheckPendingRequests` (seen with `node --trace-warnings`),
+  not our code; Node clamps the timer to 1 ms, so it's harmless. KafkaJS is at its latest version (012 T033).
+- `MSYS_NO_PATHCONV=1` (needed for `docker compose exec … /opt/…` in Git Bash) also stops Git Bash converting
+  `/c/…` paths passed to Windows programs such as `node`. Set it only for the docker command (012 T033).
+- Quoting a bad reply in the system prompt, even as a "don't say this", makes Qwen3-30B say it. The rule naming "I'll
+  connect you with a person, please wait" as a failure turned 1 such reply into 3 (012 T034). Describe the wanted
+  action without sample wording; in 011 T035, a sample reference in the prompt was copied too.
+- Eval runs on the local model vary by 2–5 cases between identical runs, so compare a prompt change on at least 2
+  runs against 2 baseline runs, never on one (012 T034).
+- In this Git Bash, a `\` inside a quoted heredoc (`<<'EOF'`) reaches the program as a single `\`, so JSON or
+  Python written that way loses escapes (`\|` became `\|`, an invalid JSON escape, three times in 012). Write
+  such text with the Write tool, or build the string in the program itself.

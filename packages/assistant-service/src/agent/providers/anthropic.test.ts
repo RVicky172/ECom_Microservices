@@ -14,34 +14,41 @@ import { anthropicProvider } from './anthropic';
 vi.mock('../../store/handoffStore', () => ({ getHandoffReference: vi.fn(), saveHandoffReference: vi.fn() }));
 vi.mock('../../clients/handoffPublisher', () => ({ publishHandoff: vi.fn() }));
 
-const sdk = vi.hoisted(() => ({ requests: [] as any[] }));
+const helloMessage = {
+  role: 'assistant',
+  model: 'stub-model',
+  content: [{ type: 'text', text: 'Hello!' }],
+  stop_reason: 'end_turn',
+  usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0 },
+};
+
+/** `calls`: the final message of each model call in the turn, played back in order. */
+const sdk = vi.hoisted(() => ({ requests: [] as any[], calls: [] as any[] }));
 
 vi.mock('@anthropic-ai/sdk', () => {
-  const finalMessage = {
-    role: 'assistant',
-    model: 'stub-model',
-    content: [{ type: 'text', text: 'Hello!' }],
-    stop_reason: 'end_turn',
-    usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0 },
-  };
-  const stream = {
+  const streamOf = (message: any) => ({
     async *[Symbol.asyncIterator]() {
-      yield { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } };
-      yield { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Hello!' } };
+      for (const [index, block] of message.content.entries()) {
+        if (block.type !== 'text') continue;
+        yield { type: 'content_block_start', index, content_block: { type: 'text', text: '' } };
+        yield { type: 'content_block_delta', index, delta: { type: 'text_delta', text: block.text } };
+      }
     },
-    finalMessage: async () => finalMessage,
-  };
+    finalMessage: async () => message,
+  });
   class Anthropic {
     beta = {
       messages: {
         toolRunner: (params: any) => {
           sdk.requests.push(params);
+          const calls = [...sdk.calls];
+          const last = calls.at(-1);
           return {
-            params: { ...params, messages: [...params.messages, { role: 'assistant', content: finalMessage.content }] },
+            params: { ...params, messages: [...params.messages, ...calls.map((call) => ({ role: 'assistant', content: call.content }))] },
             async *[Symbol.asyncIterator]() {
-              yield stream;
+              for (const call of calls) yield streamOf(call);
             },
-            done: async () => finalMessage,
+            done: async () => last,
           };
         },
       },
@@ -73,6 +80,7 @@ const runOnce = async (tools: AssistantTool<any>[] = [echoTool]) => {
 describe('anthropic provider (stubbed SDK)', () => {
   beforeEach(() => {
     sdk.requests.length = 0;
+    sdk.calls = [helloMessage];
   });
 
   it('sends the system prompt as one cached text block', async () => {
@@ -96,6 +104,32 @@ describe('anthropic provider (stubbed SDK)', () => {
     ]);
   });
 
+  it('returns the model and its token usage for a single call (012)', async () => {
+    const { output } = await runOnce();
+    expect(output.model).toBe('stub-model');
+    expect(output.usage).toEqual({ inputTokens: 1, cachedInputTokens: 0, outputTokens: 1 });
+  });
+
+  it('sums usage over every model call in the turn, counting cache writes as input (012, D-025)', async () => {
+    sdk.calls = [
+      {
+        ...helloMessage,
+        model: 'claude-opus-5-5',
+        content: [{ type: 'tool_use', id: 'tu_1', name: 'echo_tool', input: { text: 'x' } }],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 100, cache_creation_input_tokens: 2000, cache_read_input_tokens: 0, output_tokens: 40 },
+      },
+      {
+        ...helloMessage,
+        model: 'claude-opus-5-5',
+        usage: { input_tokens: 150, cache_creation_input_tokens: null, cache_read_input_tokens: 2000, output_tokens: 60 },
+      },
+    ];
+    const { output } = await runOnce();
+    expect(output.usage).toEqual({ inputTokens: 2250, cachedInputTokens: 2000, outputTokens: 100 });
+    expect(output.model).toBe('claude-opus-5-5');
+  });
+
   it('sends the store policies inside the cached system prompt (011)', async () => {
     const { request } = await runOnce();
     const [system] = request.system;
@@ -112,5 +146,29 @@ describe('anthropic provider (stubbed SDK)', () => {
     expect(handoff.input_schema.properties.reason.enum).toEqual(['customer_request', 'policy_not_covered', 'order_problem', 'other']);
     expect(handoff.input_schema.properties.summary).toMatchObject({ type: 'string', maxLength: 500 });
     expect(Object.keys(handoff.input_schema.properties).sort()).toEqual(['reason', 'summary']);
+  });
+});
+
+describe('anthropic appendReply (012 D-048)', () => {
+  it("adds a text block to the turn's last assistant message, so the stored transcript shows it", () => {
+    const messages = [
+      { role: 'user', content: 'I want a person.' },
+      { role: 'assistant', content: [{ type: 'text', text: "I'll connect you." }] },
+    ];
+    const updated = anthropicProvider.appendReply(messages, ' Correction.');
+    expect(updated.at(-1)).toEqual({
+      role: 'assistant',
+      content: [
+        { type: 'text', text: "I'll connect you." },
+        { type: 'text', text: ' Correction.' },
+      ],
+    });
+    expect(anthropicProvider.toTranscript(updated).at(-1)?.text).toContain('Correction.');
+    expect(messages[1].content).toHaveLength(1);
+  });
+
+  it('adds a new assistant message when the last one is from the user', () => {
+    const updated = anthropicProvider.appendReply([{ role: 'user', content: 'Hi' }], 'Correction.');
+    expect(updated.at(-1)).toEqual({ role: 'assistant', content: [{ type: 'text', text: 'Correction.' }] });
   });
 });
