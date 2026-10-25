@@ -11,6 +11,29 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-25 — 005: setup, upgrade steps 1–2 (T001–T007, T010, T020–T027; 16 of 43)
+
+**Done:** baseline (24 outdated packages, audit 2 high + 3 moderate, 237 tests, the baseline user registered);
+spikes: no exceptions needed, `proxy.ts` unchanged under hpm 4 + Express 5, Next type-checks with TS 7. Removed
+7 unused deps (D-032). Step 1: TS 7 + @types/node 26 everywhere, 0 new errors, dev on tsx (D-033). Step 2:
+`uuid` → `randomUUID` + shared `uuidV5` matching uuid@9 (D-034); joi 18, pino 10, ioredis 6, mongoose 9.11
+(D-035); bcryptjs 3, with an old-hash test (D-036); pg and Anthropic SDK minors. Live: 10/10 healthy, cart,
+validation, the baseline user's sign-in, and an order CONFIRMED. The seed script was not run (it wipes products);
+its Mongo ops were checked on a scratch DB. Gate: check 13/13, 246 tests, build 0. Nothing committed yet.
+**Next:** T030 (Express 5 empty-body tests).
+**Blockers:** none
+
+## 2026-10-25 — 011 merged; 012 paused; 005 spec approved
+
+**Done:** check 13/13 on 011, PR #1 squash-merged (`f6a355c`). 012's branch rebased onto `main` without the 011
+commits (local; remote not yet force-pushed). New branch `feat/005-dependency-upgrades-code-standards` from `main`
+with the 005 draft and the D-029 chore cherry-picked. 005 Q1, Q3–Q10 accepted as proposed, Q2 = 005 first (D-030);
+spec Approved, tracking JSON and roadmap synced. Plan written; P1–P5 accepted as recommended (D-031: no circuit
+breaker exists → removed with 5 other unused deps; `dev` on tsx; react-router 8; Dependabot Asia/Kolkata; ratings stay
+with 012). Tasks: 43 (T001–T092), spec In Progress. Gate: check 13/13, 237 tests.
+**Next:** `/spec-implement 005` from T001.
+**Blockers:** none
+
 ## 2026-10-24 — 011: assistant policies + handoff, implement and sign-off (T034, T035, T090–T092; 22 of 22 tasks)
 
 **Done:**

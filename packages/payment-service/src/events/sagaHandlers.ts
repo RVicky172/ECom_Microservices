@@ -1,7 +1,7 @@
-import { EventTypes, KafkaTopics, parseInventoryReserved, publishEvent } from '@ecommerce/shared';
+/** Payment's part of the checkout saga: charge the order once stock is reserved, and publish the outcome. */
+import { EventTypes, KafkaTopics, parseInventoryReserved, publishEvent, uuidV5 } from '@ecommerce/shared';
 import type { InventoryReservedData, PaymentCompletedData, PaymentFailedData, SagaEnvelope } from '@ecommerce/shared';
 import type { Producer } from 'kafkajs';
-import { v5 as uuidv5 } from 'uuid';
 import { processPayment } from '../services/paymentService';
 
 type Logger = { info: Function; warn: Function; error: Function };
@@ -35,7 +35,7 @@ export const handleInventoryReserved = async (
 
   const { orderId, items, totalAmount } = reserved;
   const payment = await processPayment(orderId, totalAmount, `evt_${event.eventId}`);
-  const outcomeEventId = uuidv5(event.eventId, PAYMENT_OUTCOME_NAMESPACE);
+  const outcomeEventId = uuidV5(event.eventId, PAYMENT_OUTCOME_NAMESPACE);
 
   if (payment.status === 'COMPLETED') {
     logger.info({ orderId }, 'Payment successful');

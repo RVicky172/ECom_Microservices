@@ -9,6 +9,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+/** Where the store policies file lives in the package: `policies/store-policies.md`. */
 export const DEFAULT_POLICIES_PATH = join(__dirname, '..', '..', 'policies', 'store-policies.md');
 
 /** Reads the policy document. A missing or empty file throws, which stops the service at startup. */

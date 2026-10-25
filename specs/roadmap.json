@@ -35,7 +35,7 @@
         {
           "id": "005",
           "name": "Dependency upgrades to latest stable, Dependabot, JSDoc on every file and export, coding standards",
-          "status": "drafted",
+          "status": "in-progress",
           "folder": "005-dependency-upgrades-code-standards"
         }
       ]
@@ -81,6 +81,7 @@
     "Services type-check against the built `packages/shared/dist` (type declarations since 2026-10-24, D-029), so shared must be built before their typecheck (found in 001; matters for CI).",
     "CI: GitHub Actions running check, test and build on every push and pull request (was Phase 0 feature 003; moved to backlog 2026-10-23, D-012). Needs Node 26 and `shared` built before the service typecheck.",
     "Persist Kafka data: the `kafka_data` volume is commented out in `docker-compose.yml`, so recreating Kafka wipes topics and consumer offsets (found in 010; 010 makes the saga robust to it).",
+    "Gateway circuit breaker: the gateway has none (`opossum` was installed but unused; removed in 005, D-031). Add one if a slow service should fail fast.",
     "Gateway rate limiter is mounted before `/health`, so a busy client (or scripted tests) makes the gateway's health check return 429 (found in 010 verify).",
     "Order list shows \"0 items\": `GET /orders` returns orders without their items, and the storefront counts `order.items` (found in 010 T034)."
   ]

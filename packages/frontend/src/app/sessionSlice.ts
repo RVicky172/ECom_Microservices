@@ -1,3 +1,4 @@
+/** Redux slice for the session flags (signed in, startup check done). */
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 /**
@@ -25,5 +26,6 @@ const sessionSlice = createSlice({
   },
 });
 
+/** Action creators of the session slice. */
 export const { setSessionResolved } = sessionSlice.actions;
 export default sessionSlice.reducer;

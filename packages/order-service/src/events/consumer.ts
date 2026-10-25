@@ -1,3 +1,4 @@
+/** The order service's saga consumer: moves each order through its states as inventory and payment events arrive. */
 import {
   KafkaTopics,
   NotFoundError,

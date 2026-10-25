@@ -1,3 +1,7 @@
+/**
+ * The gateway's routing table: which `/api/v1` prefix goes to which service, which routes need a JWT, and the
+ * headers every proxied request carries.
+ */
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { Express, Request, Response } from 'express';
 import { Logger } from 'pino';
@@ -17,6 +21,11 @@ const SERVICES = {
 /** Assistant replies stream for a while (longer with local models); default five minutes. */
 const ASSISTANT_TIMEOUT_MS = parseInt(process.env.ASSISTANT_TIMEOUT_MS || '300000', 10);
 
+/**
+ * Mounts a proxy per service. Each request gets the correlation ID, the internal service token and the
+ * `x-user-*` identity headers from the verified JWT; client-supplied copies of those headers are removed first.
+ * An unreachable service answers 502.
+ */
 export const setupProxies = (app: Express, logger: Logger) => {
   // Utility to create a proxy with error handling and correlation ID forwarding
   const createProxy = (

@@ -1,3 +1,4 @@
+/** Auth service entry point: registration, sign-in and refresh-token sessions over HTTP. */
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import authRoutes from './routes/authRoutes';

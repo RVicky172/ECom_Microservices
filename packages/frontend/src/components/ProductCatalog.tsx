@@ -1,3 +1,4 @@
+/** The product grid with add-to-cart. */
 import { useAddCartItemMutation, useGetProductsQuery } from '../api/storeApi';
 import type { Product } from '../types/store';
 import { formatCurrency, getProductImage } from '../utils/storePresentation';

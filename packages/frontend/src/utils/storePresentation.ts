@@ -1,3 +1,4 @@
+/** Display helpers for the store: prices, product images and order status badges. */
 import type { Product } from '../types/store';
 
 /** Fallback photos for seeded products that have no `imageUrl`, keyed by lowercase name. */

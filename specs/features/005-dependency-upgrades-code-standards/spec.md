@@ -1,6 +1,6 @@
 # 005 — Dependency Upgrades, Dependabot, JSDoc and Clean-Code Rules
 
-**Status:** Draft <!-- Draft | Approved | In Progress | Implemented | Superseded -->
+**Status:** In Progress <!-- Draft | Approved | In Progress | Implemented | Superseded -->
 **Roadmap phase:** 0 · **Created:** 2026-10-24 · **Owner:** RVicky172
 
 ## Summary
@@ -38,7 +38,7 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
 | pg | 8.23.0 → 8.23.1 | auth, inventory, order, payment |
 | @anthropic-ai/sdk | 1.1.0 → 1.3.0 | assistant |
 | react / react-dom / @types/react(-dom) | 18.3.x → 19.3.x | frontend |
-| react-router-dom | 6.30.6 → 7.18.4 | frontend |
+| react-router-dom → react-router | 6.30.6 → `react-router` 8.5.0 (`react-router-dom` ends at 7; v8 is one package; P3) | frontend |
 | vite / @vitejs/plugin-react | 5.4.21 / 4.7.0 → 8.3.5 / 6.1.2 | frontend |
 | typescript | 5.9.3 → 7.0.2 (root and shared already 7) | 10 packages |
 | @types/node | 20.19.43 → 26.6.5 (the runtime is Node 26) | 10 packages |
@@ -64,10 +64,12 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
 - [ ] **AC-1:** After the upgrade, `npm outdated` across the root, every workspace and `tools/spec-dashboard`
   reports no package behind its latest stable version. The only exceptions are the ones listed in this spec with a
   reason, agreed under Q3. _(manual measurement: the command output recorded in tasks.md)_
-- [ ] **AC-2:** The deprecated stub packages `@types/ioredis` and `@types/uuid` are removed, and no package has two
-  majors of the same library installed (for example `@types/express` 4 and 5). _(manual measurement: `npm ls`)_
+- [ ] **AC-2:** The deprecated stub packages `@types/ioredis` and `@types/uuid` are removed, and no library that a
+  `package.json` in this repo declares (nor its `@types` package) is installed in two majors (for example
+  `@types/express` 4 and 5). A transitive package held on an older major by an upstream package's own range is
+  out of scope: it is listed in tasks.md, not forced with `overrides`. _(manual measurement: `npm ls`)_
 - [ ] **AC-3:** `npm run check` and `npm run build` pass, and the unit-test count is at least the count before the
-  upgrade (426 on 2026-10-24). Every test changed because of an upgrade's API is listed in tasks.md with the
+  upgrade (237 on the 005 branch base, 2026-10-25; 012's tests are not on `main` yet, Q2). Every test changed because of an upgrade's API is listed in tasks.md with the
   reason. _(unit + manual measurement)_
 - [ ] **AC-4:** Every service image rebuilds from clean, and all 10 `/health` checks report healthy.
   _(manual measurement)_
@@ -77,14 +79,16 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
   - products list and search work;
   - add to cart, change the quantity and remove work;
   - an order reaches `CONFIRMED`, or `CANCELLED` with a reason;
-  - an assistant chat turn streams, and a rating saves.
+  - an assistant chat turn streams through the gateway (ratings are 012's and are checked by 012 T031 on the
+    upgraded stack; P5).
 
   _(manual measurement, recorded in tasks.md)_
 - [ ] **AC-6:** The gateway's protections behave as before:
   - a protected route without a JWT returns 401;
   - the 101st request within 15 minutes from one IP returns 429;
-  - with a service stopped, its route fails within the configured timeout, and the circuit breaker opens and
-    then recovers after the service is back.
+  - with a service stopped, its route returns 502 within the configured timeout, and works again once the
+    service is back. (The gateway has no circuit breaker: `opossum` was installed but never used. It is removed,
+    and a breaker goes to the backlog; P1.)
 
   _(manual measurement)_
 - [ ] **AC-7:** The storefront builds with the new React, router and Vite. Each of its 6 pages loads in a browser
@@ -152,23 +156,23 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
 
 Number them so answers can be referenced (Q1, Q2…). Each with a proposed default answer.
 
-- **Q1** [NEEDS CLARIFICATION] Number and phase. This is foundation work, not checkout or assistant work.
+- **Q1** **Resolved 2026-10-25 (accepted as proposed).** Number and phase. This is foundation work, not checkout or assistant work.
   _Proposed:_ 005 in Phase 0 (003 stays reserved for CI). Phase 0 keeps its exit criteria; its status line notes
   the late addition.
-- **Q2** [NEEDS CLARIFICATION] When, relative to 012? 012 is in progress with uncommitted changes, including the
-  root `package.json` and `package-lock.json`, so an upgrade now would mix with it. The upgrade would also change
-  what 012's eval runs measure. _Proposed:_ commit 012's progress on its branch, finish 012 (remaining: T027,
-  T029–T035, T090–T092), then do 005 on its own branch from `main`. _Alternative:_ commit 012's progress, pause
-  it, and do 005 first on a branch from 012's branch.
-- **Q3** [NEEDS CLARIFICATION] "Latest stable" for every major, with no exceptions? _Proposed:_ yes, all majors
-  in the table, including Express 5, React 19, react-router 7, Vite 8 and TypeScript 7. The only allowed exception
+- **Q2** **Resolved 2026-10-25 (variant chosen by RVicky172).** When, relative to 012? _Decision:_ pause 012 now
+  (its progress is committed on `feat/012-assistant-evals-feedback`) and do 005 first, on its own branch
+  `feat/005-dependency-upgrades-code-standards` from `main` after 011 was merged (PR #1). The D-029 chore
+  (shared type declarations) was carried over from 012's branch, since the upgrade builds on it. 012 resumes
+  after 005, rebased on the upgraded `main`; its eval runs (T034) measure the upgraded stack.
+- **Q3** **Resolved 2026-10-25 (accepted as proposed).** "Latest stable" for every major, with no exceptions? _Proposed:_ yes, all majors
+  in the table, including Express 5, React 19, react-router 8 (P3), Vite 8 and TypeScript 7. The only allowed exception
   is a package whose latest version doesn't support Node 26 or CommonJS and has no replacement. Each exception is
   listed in this spec with its reason, and needs the user's agreement.
-- **Q4** [NEEDS CLARIFICATION] `uuid` 14 is ESM-only and the repo is CommonJS. _Proposed:_ replace `uuid` with
+- **Q4** **Resolved 2026-10-25 (accepted as proposed).** `uuid` 14 is ESM-only and the repo is CommonJS. _Proposed:_ replace `uuid` with
   Node's built-in `crypto.randomUUID()` in shared, order and payment, and drop the dependency (Constitution III).
   _Alternative:_ keep `uuid` 14 and rely on Node 26's `require(esm)`.
-- **Q5** [NEEDS CLARIFICATION] Dependabot settings. _Proposed:_
-  - weekly, Monday morning (Europe/Berlin);
+- **Q5** **Resolved 2026-10-25 (accepted as proposed).** Dependabot settings. _Proposed:_
+  - weekly, Monday 09:00 `Asia/Kolkata` (changed from Europe/Berlin by P4, 2026-10-25);
   - npm for the root (it covers the workspaces) and for `tools/spec-dashboard`, plus Docker for each service's
     Dockerfile;
   - minor and patch updates grouped into one PR per ecosystem, and each major as its own PR;
@@ -176,18 +180,18 @@ Number them so answers can be referenced (Q1, Q2…). Each with a proposed defau
   - target branch `main`, with the label `dependencies`;
   - security updates switched on in the repository settings (done by the user, since it is a GitHub setting).
   - **Not yet:** `docker-compose.yml` infrastructure images and GitHub Actions (no workflows exist).
-- **Q6** [NEEDS CLARIFICATION] Where does the "review a Dependabot PR" checklist live? _Proposed:_ a short section
+- **Q6** **Resolved 2026-10-25 (accepted as proposed).** Where does the "review a Dependabot PR" checklist live? _Proposed:_ a short section
   in `specs/workflow.md`, linked from `README.md`.
-- **Q7** [NEEDS CLARIFICATION] Upgrade in one go or in steps? _Proposed:_ five steps, each green before the next:
+- **Q7** **Resolved 2026-10-25 (accepted as proposed).** Upgrade in one go or in steps? _Proposed:_ five steps, each green before the next:
   1. tooling and types (TypeScript 7, @types/node 26, remove the stubs);
   2. backend libraries (joi, pino, ioredis, mongoose, pg, bcryptjs, uuid, @anthropic-ai/sdk);
   3. Express 5 with the gateway middleware (express-rate-limit, http-proxy-middleware, opossum);
   4. frontend (React 19, react-router 7, Vite 8);
   5. `tools/spec-dashboard`.
-- **Q8** [NEEDS CLARIFICATION] Add ESLint or Prettier to enforce style? _Proposed:_ no, not in 005: they bring
+- **Q8** **Resolved 2026-10-25 (accepted as proposed).** Add ESLint or Prettier to enforce style? _Proposed:_ no, not in 005: they bring
   new tooling and a large reformatting diff. The JSDoc rule is enforced by a small in-house check in
   `npm run check` (AC-11). ESLint goes to the backlog.
-- **Q9** [NEEDS CLARIFICATION] Where do the coding rules live, and which patterns? _Proposed:_
+- **Q9** **Resolved 2026-10-25 (accepted as proposed).** Where do the coding rules live, and which patterns? _Proposed:_
   - **Where:** a new `specs/coding-standards.md`, referenced from the constitution (version 1.0.0 → 1.1.0, a
     MINOR amendment), `CLAUDE.md` and `specs/workflow.md`.
   - **Patterns already in the repo:** layered controller → service → data access; adapter and strategy (assistant
@@ -196,9 +200,18 @@ Number them so answers can be referenced (Q1, Q2…). Each with a proposed defau
   - **Clean-code rules:** pure cores with thin I/O shells; small single-purpose functions; names that say intent;
     no `any` in new code; typed errors through the shared `AppError`s; no magic numbers (named constants);
     comments that say why, not what; and the JSDoc rule from AC-10.
-- **Q10** [NEEDS CLARIFICATION] Is `tools/spec-dashboard` (Next.js 16) included? _Proposed:_ yes, in step 5 and in
+- **Q10** **Resolved 2026-10-25 (accepted as proposed).** Is `tools/spec-dashboard` (Next.js 16) included? _Proposed:_ yes, in step 5 and in
   Dependabot.
 
 ## Changelog
 
 - 2026-10-24 — Created from the user's request (upgrades, Dependabot, JSDoc, coding rules).
+- 2026-10-25 — Approved: Q1, Q3–Q10 as proposed; Q2 = pause 012 and do 005 first from `main` (D-030). AC-3's
+  test baseline is now 237 (this branch).
+- 2026-10-25 — Plan points P1–P5 accepted as recommended (D-031): AC-6 drops the circuit breaker (none exists;
+  `opossum`, `express-rate-limit` and other unused dependencies removed; breaker to the backlog); react-router 8
+  replaces react-router-dom 7; services' `dev` runs on `tsx` (ts-node cannot run on TS 7); Dependabot on
+  Asia/Kolkata; AC-5 checks the assistant turn only (ratings stay with 012).
+- 2026-10-25 — AC-2 narrowed (user's call at T062): it covers the libraries our `package.json`s declare and their
+  `@types`. Transitive duplicates pinned by upstream ranges (`mime-types` 2/3, `picomatch` 2/4) are recorded in
+  tasks.md, not overridden.

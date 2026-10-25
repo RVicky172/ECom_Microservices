@@ -1,3 +1,7 @@
+/**
+ * Service-to-service trust: the shared internal token that proves a request came through the gateway or the
+ * assistant.
+ */
 import { timingSafeEqual } from 'crypto';
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { UnauthorizedError } from '../errors';

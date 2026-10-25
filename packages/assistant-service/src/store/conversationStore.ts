@@ -16,6 +16,7 @@ import type { ProviderId } from '../config';
 import { config } from '../config';
 import { redis } from './redis';
 
+/** A stored conversation: its messages and the provider whose format they are in. */
 export interface StoredConversation {
   provider: ProviderId;
   messages: unknown[];
@@ -24,6 +25,7 @@ export interface StoredConversation {
 const conversationKey = (userId: string, conversationId: string) => `assistant:conv:${userId}:${conversationId}`;
 const lockKey = (userId: string, conversationId: string) => `assistant:lock:${userId}:${conversationId}`;
 
+/** The user's stored conversation, or `null` if there is none (or it expired). */
 export const loadConversation = async (userId: string, conversationId: string): Promise<StoredConversation | null> => {
   const raw = await redis.get(conversationKey(userId, conversationId));
   if (!raw) return null;
@@ -32,6 +34,7 @@ export const loadConversation = async (userId: string, conversationId: string): 
   return Array.isArray(parsed) ? { provider: 'anthropic', messages: parsed } : parsed;
 };
 
+/** Stores the conversation and renews its expiry (`config.conversationTtlSeconds`). */
 export const saveConversation = async (
   userId: string,
   conversationId: string,
@@ -40,6 +43,7 @@ export const saveConversation = async (
   await redis.set(conversationKey(userId, conversationId), JSON.stringify(conversation), 'EX', config.conversationTtlSeconds);
 };
 
+/** Deletes the user's conversation ("new chat"). */
 export const deleteConversation = async (userId: string, conversationId: string): Promise<void> => {
   await redis.del(conversationKey(userId, conversationId));
 };
@@ -54,6 +58,7 @@ export const acquireTurnLock = async (userId: string, conversationId: string): P
   return result === 'OK';
 };
 
+/** Releases the lock taken by `acquireTurnLock`. */
 export const releaseTurnLock = async (userId: string, conversationId: string): Promise<void> => {
   await redis.del(lockKey(userId, conversationId));
 };

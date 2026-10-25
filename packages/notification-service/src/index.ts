@@ -1,3 +1,4 @@
+/** Notification service entry point: a `/health` endpoint and the Kafka consumer that sends (simulated) emails. */
 import express from 'express';
 import { createLogger, correlationId } from '@ecommerce/shared';
 import { startConsumer } from './events/consumer';

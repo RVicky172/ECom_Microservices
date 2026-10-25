@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+/** The store's left navigation. */
+import { NavLink } from 'react-router';
 import { useSignOut } from '../hooks/useSession';
 import { useStoreCounts } from '../hooks/useStoreCounts';
 import { paths } from '../routes/paths';

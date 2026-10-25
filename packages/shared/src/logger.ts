@@ -1,3 +1,6 @@
+/**
+ * The services' logger: pino writing one JSON object per line.
+ */
 import pino, { Logger } from 'pino';
 
 /**

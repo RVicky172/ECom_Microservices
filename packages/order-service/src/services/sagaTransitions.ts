@@ -1,3 +1,4 @@
+/** What each saga event means for an order's status, as a pure function the consumer applies. */
 import { KafkaTopics, OrderStatus } from '@ecommerce/shared';
 import type { CancelReason } from '@ecommerce/shared';
 

@@ -1,3 +1,4 @@
+/** The payment service's saga consumer and its producer for payment outcomes. */
 import { createKafkaClient, createProducer, KafkaTopics, startSagaConsumer } from '@ecommerce/shared';
 import type { SagaConsumerHandle } from '@ecommerce/shared';
 import type { Producer } from 'kafkajs';

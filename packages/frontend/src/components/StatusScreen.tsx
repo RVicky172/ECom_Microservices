@@ -1,3 +1,4 @@
+/** A full-page loading placeholder. */
 interface StatusScreenProps {
   /** Text announced to the user (and to screen readers via `role="status"`). */
   message: string;

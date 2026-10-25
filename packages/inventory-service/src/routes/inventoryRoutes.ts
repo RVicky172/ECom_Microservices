@@ -1,3 +1,4 @@
+/** Routes under `/api/v1/inventory`. */
 import express from 'express';
 import * as inventoryController from '../controllers/inventoryController';
 

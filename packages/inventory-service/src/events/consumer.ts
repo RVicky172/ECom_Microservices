@@ -1,3 +1,4 @@
+/** The inventory service's Kafka consumer: wires the saga topics to their handlers in `sagaHandlers.ts`. */
 import { createKafkaClient, createProducer, KafkaTopics, startSagaConsumer } from '@ecommerce/shared';
 import type { SagaConsumerHandle } from '@ecommerce/shared';
 import type { Producer } from 'kafkajs';

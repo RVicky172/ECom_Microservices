@@ -1,3 +1,4 @@
+/** A message bubble in the assistant chat. */
 import type { ChatItem } from '../../types/assistant';
 import { formatCurrency } from '../../utils/storePresentation';
 import { ProposalButton } from './ProposalButton';

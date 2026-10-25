@@ -1,3 +1,4 @@
+/** Routes under `/api/v1/auth`. */
 import express from 'express';
 import * as authController from '../controllers/authController';
 

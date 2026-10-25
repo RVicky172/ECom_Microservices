@@ -18,6 +18,7 @@ export class ToolFailure extends Error {
   }
 }
 
+/** A tool the model can call. */
 export interface AssistantTool<Schema extends z.ZodType = z.ZodType> {
   name: string;
   /** What the tool does and when to use it; the model reads this. */

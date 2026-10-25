@@ -1,5 +1,7 @@
+/** Inventory's PostgreSQL connection and schema (`stock_levels`, `processed_events`). */
 import knex from 'knex';
 
+/** The knex connection to `inventory_db`, configured from the `POSTGRES_*` variables. */
 export const db = knex({
   client: 'pg',
   connection: {
@@ -12,6 +14,7 @@ export const db = knex({
   pool: { min: 2, max: 10 },
 });
 
+/** Creates the tables if they are missing. Run once at startup, before serving or consuming. */
 export const runMigrations = async (): Promise<void> => {
   if (!(await db.schema.hasTable('stock_levels'))) {
     await db.schema.createTable('stock_levels', (table) => {

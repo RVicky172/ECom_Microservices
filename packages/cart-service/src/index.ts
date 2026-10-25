@@ -1,3 +1,4 @@
+/** Cart service entry point: the cart HTTP API, backed by Redis. */
 import express from 'express';
 import { createLogger, correlationId, errorHandler, requireInternalToken } from '@ecommerce/shared';
 import cartRoutes from './routes/cartRoutes';

@@ -1,4 +1,5 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+/** The route guard for signed-in pages. */
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { StatusScreen } from '../components/StatusScreen';
 import { useSession } from '../hooks/useSession';
 import { paths, type LoginRedirectState } from './paths';

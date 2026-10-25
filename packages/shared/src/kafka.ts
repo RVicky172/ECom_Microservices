@@ -1,5 +1,9 @@
+/**
+ * KafkaJS helpers for the saga: clients, producers and consumers with the platform's settings, publishing in the
+ * standard envelope, creating topics, and a saga consumer that keeps retrying until it runs.
+ */
 import { Kafka, logLevel, Producer, Consumer, type KafkaConfig, type RetryOptions } from 'kafkajs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import type { EventTypes, KafkaTopics, SagaEnvelope } from './events';
 
 /** Timeouts and retry limits that replace the client defaults (e.g. to bound how long a send may keep trying). */
@@ -66,7 +70,7 @@ export const publishEvent = async (
   aggregateId: string,
   data: object,
   correlationId: string,
-  eventId: string = uuidv4(),
+  eventId: string = randomUUID(),
 ): Promise<void> => {
   const envelope: SagaEnvelope = { eventId, eventType, aggregateId, data, timestamp: new Date().toISOString() };
   await producer.send({
@@ -100,6 +104,7 @@ export const ensureTopics = async (kafka: Kafka, topics: KafkaTopics[]): Promise
 
 type SagaLogger = Pick<Console, 'info' | 'warn' | 'error'> | { info: Function; warn: Function; error: Function };
 
+/** What `startSagaConsumer` needs: which group and topics, where to log, and the message handler. */
 export interface SagaConsumerOptions {
   clientId: string;
   groupId: string;
@@ -113,6 +118,7 @@ export interface SagaConsumerOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** Returned by `startSagaConsumer`; `/health` reads `status()`. */
 export interface SagaConsumerHandle {
   /** `running` once subscribed and consuming; `starting` while (re)trying. */
   status: () => 'starting' | 'running';

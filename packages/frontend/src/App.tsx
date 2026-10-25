@@ -1,4 +1,5 @@
-import { RouterProvider } from 'react-router-dom';
+/** The root component: restores the session, then renders the router. */
+import { RouterProvider } from 'react-router';
 import { useSessionBootstrap } from './hooks/useSession';
 import { router } from './routes/router';
 import './styles.css';

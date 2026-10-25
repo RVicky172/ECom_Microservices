@@ -20,6 +20,7 @@ const int = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+/** The assistant's settings, with defaults for local development. */
 export const config = {
   port: int(process.env.PORT, 4008),
 

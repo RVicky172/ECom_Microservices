@@ -1,3 +1,7 @@
+/**
+ * Accounts and sessions: bcrypt password hashes, short-lived access tokens (JWT) and rotating refresh tokens, stored
+ * only as SHA-256 hashes in `refresh_sessions`.
+ */
 import bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { db } from '../models/userModel';
@@ -49,6 +53,11 @@ const createSession = async (user: UserResponse): Promise<AuthResponse> => {
   return { user, accessToken, refreshToken };
 };
 
+/**
+ * Creates a user and opens a session.
+ *
+ * @throws ConflictError when the email is already registered
+ */
 export const register = async ({
   email,
   password,
@@ -69,6 +78,11 @@ export const register = async ({
   return createSession(user);
 };
 
+/**
+ * Checks the password and opens a session.
+ *
+ * @throws ValidationError with the same message for an unknown email and a wrong password
+ */
 export const login = async ({ email, password }: LoginInput): Promise<AuthResponse> => {
   const user = await db('users').where({ email }).first();
   if (!user) {
@@ -88,6 +102,12 @@ export const login = async ({ email, password }: LoginInput): Promise<AuthRespon
   });
 };
 
+/**
+ * Exchanges a refresh token for a new access token and a new refresh token, deleting the old session in the same
+ * transaction (the row is locked, so two concurrent refreshes can't both succeed). An expired session is deleted.
+ *
+ * @throws UnauthorizedError for an unknown or expired token
+ */
 export const rotateRefreshToken = async (refreshToken: string): Promise<AuthResponse> => {
   const tokenHash = hashRefreshToken(refreshToken);
 
@@ -138,12 +158,18 @@ export const rotateRefreshToken = async (refreshToken: string): Promise<AuthResp
   });
 };
 
+/** Deletes the session for this refresh token, if any (sign-out). */
 export const revokeRefreshToken = async (refreshToken: string | undefined): Promise<void> => {
   if (refreshToken) {
     await db('refresh_sessions').where({ token_hash: hashRefreshToken(refreshToken) }).delete();
   }
 };
 
+/**
+ * The public fields of a user.
+ *
+ * @throws NotFoundError when the user doesn't exist
+ */
 export const getProfile = async (userId: string): Promise<UserResponse> => {
   const user = await db('users')
     .select('id', 'email', 'name', 'role', 'created_at')

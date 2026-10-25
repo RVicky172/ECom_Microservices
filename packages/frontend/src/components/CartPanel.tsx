@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+/** The cart panel with checkout. */
+import { Link } from 'react-router';
 import { useCheckoutMutation, useGetCartQuery } from '../api/storeApi';
 import { paths } from '../routes/paths';
 import { formatCurrency } from '../utils/storePresentation';

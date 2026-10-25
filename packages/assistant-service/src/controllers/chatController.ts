@@ -1,3 +1,7 @@
+/**
+ * HTTP handlers for `/api/v1/assistant`: run a chat turn as a Server-Sent Events stream, and read or delete a
+ * stored conversation.
+ */
 import { randomUUID } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
 import type { Logger } from 'pino';
@@ -121,7 +125,7 @@ export const postChat = async (req: Request, res: Response, next: NextFunction):
 };
 
 /** GET /api/v1/assistant/conversations/:id — the visible transcript, for restoring the chat after a reload. */
-export const getConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getConversation = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
   try {
     const ctx = contextFrom(req, req.params.id);
     const stored = await conversations.loadConversation(ctx.userId, req.params.id);
@@ -133,7 +137,7 @@ export const getConversation = async (req: Request, res: Response, next: NextFun
 };
 
 /** DELETE /api/v1/assistant/conversations/:id — the user clears their chat history. */
-export const deleteConversation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const deleteConversation = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
   try {
     const ctx = contextFrom(req, req.params.id);
     await conversations.deleteConversation(ctx.userId, req.params.id);

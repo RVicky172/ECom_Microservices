@@ -1,3 +1,4 @@
+/** The app's URLs and the metadata routes carry. */
 /** Every URL the app can navigate to. Use these instead of string literals. */
 export const paths = {
   login: '/login',

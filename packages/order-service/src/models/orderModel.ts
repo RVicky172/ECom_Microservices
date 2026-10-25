@@ -1,5 +1,7 @@
+/** Order's PostgreSQL connection and schema (`orders`, `order_items`, `outbox_events`). */
 import knex from 'knex';
 
+/** The knex connection to `order_db`, configured from the `POSTGRES_*` variables. */
 export const db = knex({
   client: 'pg',
   connection: {

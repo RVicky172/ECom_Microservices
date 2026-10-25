@@ -1,3 +1,4 @@
+/** The notifications themselves. There is no mail server: each "email" is a log line tagged `[EMAIL SENT]`. */
 import type { HandoffRequestedData } from '@ecommerce/shared';
 
 interface NotificationData {
@@ -6,6 +7,7 @@ interface NotificationData {
   reason?: string;
 }
 
+/** Tells the shopper their order was received (`order.created`). */
 export const sendOrderCreatedEmail = async (data: NotificationData, logger: any): Promise<void> => {
   logger.info(
     { orderId: data.orderId, userId: data.userId },
@@ -13,6 +15,7 @@ export const sendOrderCreatedEmail = async (data: NotificationData, logger: any)
   );
 };
 
+/** Tells the shopper the payment went through and the order is confirmed (`payment.completed`). */
 export const sendPaymentSuccessEmail = async (data: NotificationData, logger: any): Promise<void> => {
   logger.info(
     { orderId: data.orderId },
@@ -20,6 +23,7 @@ export const sendPaymentSuccessEmail = async (data: NotificationData, logger: an
   );
 };
 
+/** Tells the shopper the payment failed and the order was cancelled (`payment.failed`). */
 export const sendPaymentFailedEmail = async (data: NotificationData, logger: any): Promise<void> => {
   logger.info(
     { orderId: data.orderId, reason: data.reason },

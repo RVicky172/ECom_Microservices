@@ -62,6 +62,7 @@ const axiosBaseQuery: BaseQueryFn<AxiosBaseQueryArgs, unknown, AxiosBaseQueryErr
   }
 };
 
+/** The RTK Query API: its endpoints generate the `use…Query` / `use…Mutation` hooks the components use. */
 export const storeApi = createApi({
   reducerPath: 'storeApi',
   baseQuery: axiosBaseQuery,

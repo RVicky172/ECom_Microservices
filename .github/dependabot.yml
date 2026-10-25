@@ -1,0 +1,53 @@
+# Dependabot version updates (005, AC-8). There is no CI yet, so each PR is reviewed locally:
+# see "Reviewing a Dependabot PR" in specs/workflow.md. Minor and patch updates are grouped
+# per ecosystem; every major gets its own PR. Security updates are switched on in the
+# repository settings.
+version: 2
+updates:
+  # The root workspace: every packages/* service, shared and the frontend.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    target-branch: main
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+
+  # The spec dashboard has its own lockfile outside the workspaces.
+  - package-ecosystem: npm
+    directory: /tools/spec-dashboard
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    target-branch: main
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+
+  # Base images of every service's Dockerfile.
+  - package-ecosystem: docker
+    directories: ["/packages/*"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    target-branch: main
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]

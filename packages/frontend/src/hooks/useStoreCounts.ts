@@ -1,3 +1,4 @@
+/** Live product, cart and order counts for the navigation and overview. */
 import { useGetCartQuery, useGetOrdersQuery, useGetProductsQuery } from '../api/storeApi';
 
 /**
