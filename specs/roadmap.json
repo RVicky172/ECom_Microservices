@@ -1,6 +1,6 @@
 {
   "project": "mercato — E-Commerce Microservices Platform",
-  "updated": "2026-10-24",
+  "updated": "2026-10-25",
   "phases": [
     {
       "number": 0,
@@ -35,7 +35,7 @@
         {
           "id": "005",
           "name": "Dependency upgrades to latest stable, Dependabot, JSDoc on every file and export, coding standards",
-          "status": "in-progress",
+          "status": "done",
           "folder": "005-dependency-upgrades-code-standards"
         }
       ]
@@ -83,6 +83,13 @@
     "Persist Kafka data: the `kafka_data` volume is commented out in `docker-compose.yml`, so recreating Kafka wipes topics and consumer offsets (found in 010; 010 makes the saga robust to it).",
     "Gateway circuit breaker: the gateway has none (`opossum` was installed but unused; removed in 005, D-031). Add one if a slow service should fail fast.",
     "Gateway rate limiter is mounted before `/health`, so a busy client (or scripted tests) makes the gateway's health check return 429 (found in 010 verify).",
-    "Order list shows \"0 items\": `GET /orders` returns orders without their items, and the storefront counts `order.items` (found in 010 T034)."
+    "Order list shows \"0 items\": `GET /orders` returns orders without their items, and the storefront counts `order.items` (found in 010 T034).",
+    "ESLint and Prettier: 005 added only the JSDoc and file-size checks (D-044); naming and nesting rules are review-only.",
+    "Kafka dead-letter topic: after a few retries, a failing saga message goes to `<topic>.dlq` with its error instead of only to the logs (coding standards rule 13, D-042).",
+    "Outbox correlation ID: the relay sends the order ID as `correlation-id`; store the request's correlation ID on the outbox row (rule 10, D-042).",
+    "Fail fast without `JWT_SECRET` instead of the hard-coded fallback (rule 11, D-042).",
+    "OpenTelemetry distributed tracing, beyond correlation IDs (D-043).",
+    "Timeouts: a proxy timeout on every gateway route (only the assistant has one) and Redis command timeouts (rule 12, D-043).",
+    "Gateway image runs `npx tsx` from source, so each start downloads tsx (needs network, slower start); build it or install tsx in the image (found in 005 verify)."
   ]
 }

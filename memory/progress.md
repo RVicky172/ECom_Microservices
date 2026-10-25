@@ -11,6 +11,21 @@ Newest first. One entry per working session.
 
 ---
 
+## 2026-10-25 — 005: steps 3–5, Dependabot, JSDoc, standards, verify (T030–T092; 43 of 43) ✔️
+
+**Done:** Express 5 + hpm 4 with shared `bodyOf` (D-037); React 19, react-router 8, Vite 8 (D-038, two Reacts fixed
+by `npm dedupe`); dashboard on TS 7 (D-039). Clean rebuild 139 s, 10/10 healthy; end to end: the pre-upgrade user,
+cart, CONFIRMED and CANCELLED/OUT_OF_STOCK orders, an assistant turn streamed on LM Studio. `npm outdated` empty,
+audit 0; AC-2 narrowed to declared libraries (D-040). Dependabot config, plus a review checklist. PR #2 merged; on
+GitHub, 3 update jobs succeeded and alerts went from 26 to 0. JSDoc checker (D-041) with 113 files / 266 exports
+documented (comments only, verified against a snapshot), and a file-size gate (D-044). `specs/coding-standards.md`:
+16 rules, two review rounds with the user (D-042, D-043); constitution 1.1.0. Records, README and architecture
+updated. Verify: check 15/15, build 0, 283 tests, 10/10 /health on rebuilt images, 13/13 ACs.
+**Next:** commit and PR `feat/005-standards-and-records` (uncommitted); then rebase 012 onto `main` and resume
+it (T031).
+**Blockers:** none. One `npm run check` failure during T087 could not be reproduced (7 green runs since). The
+gateway image downloads tsx at start-up (pre-existing; backlog).
+
 ## 2026-10-25 — 005: setup, upgrade steps 1–2 (T001–T007, T010, T020–T027; 16 of 43)
 
 **Done:** baseline (24 outdated packages, audit 2 high + 3 moderate, 237 tests, the baseline user registered);

@@ -50,7 +50,7 @@ can run in parallel with `[P]`. Every AC is covered by at least one task (AC cov
 
 ## Stage 4 — Implement
 
-Work one task at a time. After each task:
+Work one task at a time, following `specs/coding-standards.md` for new and changed code. After each task:
 
 1. Run `npm run check`. Fix until green.
 2. Tick the task in `tasks.md` and add a short dated **Result** note under it: what was done, what was measured,

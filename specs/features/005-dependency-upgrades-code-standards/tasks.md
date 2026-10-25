@@ -393,9 +393,19 @@ commit, `chore(005): step N — …`, committed when the user asks (CLAUDE.md). 
     base image) and `/health`; for a major, release notes, an end-to-end try and a `decisions.md` entry (code
     changes → a spec); merge only when green. `README.md` links it from a new "Review a Dependabot pull
     request" step after "Update one service after dependency changes". Waiting for the user's review (AC-9).
-- [ ] **T072** — Once the branch is on GitHub (pushed when the user asks), check that the repository's Dependabot
+- [x] **T072** — Once the branch is on GitHub (pushed when the user asks), check that the repository's Dependabot
       page shows the configuration with no errors. The user switches on security updates in the repo settings ·
       files: none · test: recorded output (AC-8)
+  - **Result (2026-10-25):** branch pushed and PR #2 opened, then squash-merged to `main` at the user's request
+    (`fa27285`, 15:12:37 UTC). Dependabot alerts and security updates were switched on through the API at the
+    user's request (`vulnerability-alerts` 204; `automated-security-fixes` `enabled: true`). After the merge, GitHub
+    lists the **Dependabot Updates** workflow, and it ran exactly the 3 configured jobs: `npm_and_yarn in /.`,
+    `npm_and_yarn in /tools/spec-dashboard` and `docker in /packages/*`. All 3 ended `success` with no PRs, since
+    everything is current. Alerts: 26 open on the old `main` (high: body-parser, follow-redirects, vite) → 0 open,
+    26 fixed. Two security-update jobs started before the merge, for `/packages/payment-service` (uuid) and
+    `/packages/frontend` (vite), failed with `dependency_file_not_supported` (a workspace folder has no lockfile of
+    its own); they were not caused by our config. The remaining 005 work continues on
+    `feat/005-standards-and-records` from the merged `main`.
 
 ## JSDoc check (plan §7)
 
@@ -487,42 +497,160 @@ commit, `chore(005): step N — …`, committed when the user asks (CLAUDE.md). 
 
 ## Coding standards and records (plan §8)
 
-- [ ] **T085** — Write `specs/coding-standards.md`:
+- [x] **T085** — Write `specs/coding-standards.md`:
       - the patterns, each with a `file:line` example: layered controller → service → data access; adapter and
         strategy (providers); observer (`TurnObserver`, if on `main` — otherwise the Kafka consumer handlers);
         factory functions; saga and outbox; injected dependencies;
       - the clean-code rules, each with an example and a counter-example;
       - the JSDoc content rule.
+  - **Result (2026-10-25):** `specs/coding-standards.md`:
+    - **6 patterns:** layered route → controller → service → data access; adapter + strategy (assistant
+      providers); observer (the saga consumers' `onMessage` handlers, since `TurnObserver` is only on 012's
+      branch); factory functions; saga + outbox (with idempotent handlers and the state machine as the gate);
+      dependencies injected through parameters.
+    - **8 clean-code rules**, each with a repo example and a counter-example: 7 counter-examples are real code to
+      fix when touched (`rateLimiter` state, `productService` page parsing, `any` in order/inventory,
+      `getProfile`'s hand-built 401, the magic `360`/`30000`, what-comments). The JSDoc rule's is labelled made
+      up, because T081 left none.
+    - The JSDoc content rule.
+
+    **References checked:** a script resolves every `path:line` (and `:line` / "line N" after a path) and prints
+    the line it points to: 58 line references, all on the intended code. One was off by one after T080 added a
+    doc line (`toolTypes.ts:21` → `:22`, fixed). Waiting for the user's review (AC-12).
+  - **Update (2026-10-25), after the user's review:** a "Distributed-system rules" section, rules 9–13 (the JSDoc
+    rule is now 14):
+    - **9, correlation ID on every hop:** found a real break; the outbox relay sends the order ID as
+      `correlation-id` (`producer.ts:48`).
+    - **10, fail-fast configuration:** `runAgent.ts:26` versus the `JWT_SECRET` fallback.
+    - **11, poison messages:** current behaviour is log and skip, never blocking a partition. The gap (no
+      dead-letter topic, no retry) is stated as a known gap, not as a rule.
+    - **12, additive event changes:** including why a new closed-set value isn't additive (`events.ts:191`).
+    - **13, contract tests:** `events.test.ts:84`.
+
+    OpenTelemetry is not adopted (Constitution III). 70 line references re-checked, all on the intended code.
+    Spec Changelog and D-042; the three gaps join the backlog in T087.
+  - **Update 2 (2026-10-25), the user's second review:** rules renumbered 1–16 under Clean-code, Structure,
+    Comments, Distributed-system and Documentation. The old numbering skipped 8. Added:
+    - a naming table matching the repo (kebab-case packages, camelCase files, PascalCase components, no `I`
+      prefix, units in constant names), with 4 real counter-examples (`valid`, `reader`, `IProduct`, `CART_TTL`);
+    - nesting ≤ 3 with guard clauses (`kafka.ts:173` sits 4 deep);
+    - **file size:** measured, all 113 source files are within 200 code lines; the largest is
+      `openaiCompatible.ts` at 194;
+    - "one responsibility per file", instead of the suggested "one primary export": controllers export one
+      handler per route, and `events.ts` is the shared contract (Constitution V);
+    - logging with the correlation ID (`console.log` in the migrations as counter-example);
+    - outbound timeouts and retries. Counter-examples: no gateway proxy timeout except the assistant's, and no
+      Redis command timeout in cart. No circuit breaker exists, which is stated;
+    - dead-letter topic as a stated target;
+    - versioned topics (`order.created.v2`) for breaking changes.
+
+    85 line references re-checked, all on the intended code. D-043.
 
       Check that every `file:line` reference exists · files: `specs/coding-standards.md` · test: manual review
       (AC-12)
-- [ ] **T086** — Reference the standards:
+- [x] **T086** — Reference the standards:
       - `specs/constitution.md` → version 1.1.0, with a "Coding standards" line under Quality Gates;
       - a Key Docs row in `CLAUDE.md`;
       - Stage 4 of `specs/workflow.md`;
       - the TypeScript convention in `specs/architecture.md`.
+  - **Result (2026-10-25):** the standards are referenced from:
+    - `specs/constitution.md`: version **1.1.0** (MINOR: a quality gate added), "Amended 2026-10-25", and
+      Definition-of-Done item 6 "Coding standards" (follow the standards; `npm run check` enforces the JSDoc and
+      file-size rules; the rest in review);
+    - `CLAUDE.md`: a Key Docs row ("Before writing or reviewing code"), and the `npm run check` line names the
+      new checks;
+    - `specs/workflow.md` Stage 4: "following `specs/coding-standards.md` for new and changed code";
+    - `specs/architecture.md`: the TypeScript convention now points to the standards.
+
+    **Also, at the user's request:** a file-size gate, `scripts/check-size.mjs` with the rule in
+    `scripts/lib/sizeCheck.mjs`, 8 tests (tests 26 in `scripts`). It fails a source file over 300 code lines and
+    warns over 200; comments and blank lines don't count. Seen failing: before the module existed; then a
+    temporary 301-line file → `FAIL file size (check-size)` naming it; `>` changed to `>=` → 1 test fails. All
+    restored. `npm run check` → **15 checks**, all pass. Today's largest file is 194 code lines. D-044.
 
       Decision entry for the constitution amendment · files: those files, `memory/decisions.md` · test: manual
       review (AC-12)
-- [ ] **T087** — Records:
+- [x] **T087** — Records:
       - `specs/tech-stack.md`: the new majors; `ts-node` out, `tsx` for all dev servers; lint "JSDoc check
         (005)"; the dashboard's TypeScript per T050;
       - `memory/learnings.md`: the upgrade gotchas;
-      - roadmap backlog: ESLint and Prettier;
+      - roadmap backlog: ESLint and Prettier; a Kafka dead-letter topic and retry; the outbox relay's correlation
+        ID; fail-fast `JWT_SECRET` (D-042); OpenTelemetry tracing; proxy timeouts for every gateway route and
+        Redis command timeouts (D-043);
       - check that the decisions log has one entry per major and that D-029 is superseded.
 
       · files: `specs/tech-stack.md`, `memory/learnings.md`, `specs/roadmap.md`, `specs/roadmap.json` · test:
       manual review (AC-13)
+  - **Result (2026-10-25):**
+    - **`specs/tech-stack.md`** (last updated 2026-10-25), checked against `npm ls`: Express 5, hpm 4 (ESM),
+      Mongoose 9.11, ioredis 6, bcryptjs 3, Joi 18, Pino 10, Anthropic SDK 1.3, React 19, Vite 8, React Router 8,
+      TypeScript 7. New rows: IDs on `node:crypto`; Dependabot. Dev servers all `tsx`. Lint/format = the JSDoc
+      and file-size checks, ESLint and Prettier in the backlog. Dashboard on TS 7 (D-039). The empty "Explicitly
+      not used" table now lists `ts-node`, `uuid`, `opossum`/`express-rate-limit` and the 4 deprecated `@types`
+      stubs, with reasons.
+    - **Learnings:** the upgrade gotchas were recorded as found (Express 5 body, TS 7 API, ESM under node20,
+      `@types/express` 5 params, two Reacts, CRLF and `sed -i`, Edit trailing whitespace). Added two Dependabot
+      ones: the config is read only from the default branch, and workspace-folder security jobs fail.
+    - **Roadmap backlog** (`roadmap.md` and `roadmap.json`, 22 items each): ESLint and Prettier; a Kafka
+      dead-letter topic; the outbox correlation ID; fail-fast `JWT_SECRET`; OpenTelemetry; gateway and Redis
+      timeouts. The circuit breaker was already there (D-031).
+    - **Decisions:** one entry per major: TS 7 D-033, uuid D-034, joi/pino/ioredis/mongoose D-035 (a section
+      each), bcryptjs D-036, Express 5 + hpm 4 D-037, React 19/react-router 8/Vite 8 D-038, dashboard D-039;
+      removals D-032. D-029 is marked "Superseded by D-037".
+
+    Check 15/15 (the tracking files agree). Waiting for the user's review (AC-13).
 
 ## Verify
 
-- [ ] **T090** — Update `specs/architecture.md`: the Express 5 notes (`bodyOf`), the uuid helper, the gateway
+- [x] **T090** — Update `specs/architecture.md`: the Express 5 notes (`bodyOf`), the uuid helper, the gateway
       without a breaker, and the doc-check gate.
-- [ ] **T091** — Every Definition-of-Done gate green (`specs/constitution.md`): `npm run check` (14 checks),
+  - **Result (2026-10-25):** `specs/architecture.md`:
+    - the layout lists `bodyOf`/`uuidV5` in shared, the check gates in `scripts/` and `.github/dependabot.yml`;
+    - the request path says the gateway has no circuit breaker (502 from the proxy, a timeout only on the
+      assistant route);
+    - the Validation convention says to validate `bodyOf(req)`, never `req.body`, on Express 5;
+    - new IDs and Fast-gate conventions (15 checks); Runtime adds TypeScript 7 and `tsx`.
+
+    Also corrected `README.md`'s tech tables, which still showed Express 4, React 18, Vite 5, uuid and
+    TypeScript 5.3, and listed Jest, Supertest, ESLint and Prettier, none of which the repo uses. They now show
+    the installed majors, Vitest, the check gates and Dependabot, with ESLint/Prettier marked as backlog.
+- [x] **T091** — Every Definition-of-Done gate green (`specs/constitution.md`): `npm run check` (15 checks since D-044),
       `npm run build`, 10/10 `/health`. Record the numbers and the test count (≥ 237, AC-3), and list every test
       changed because of an upgrade, with its reason.
-- [ ] **T092** — Tick the ACs in `spec.md` and `feature.json` (Status `Implemented`). Update `roadmap.md`/`.json`,
+  - **Result (2026-10-25):** every Definition-of-Done gate green:
+    - `npm run check`: **15/15**, re-run 7 times after one unexplained failure during T087 (its output was cut
+      off; not reproduced since);
+    - `npm run build`: exit 0, with the frontend's >500 kB chunk warning (711 kB, gzip 220 kB), present before
+      005;
+    - `docker compose up -d --build`: all images rebuilt with the doc-comment changes, in 48 s; **10/10
+      `/health` 200**. The gateway answered 000 on the first probe while it started; its `CMD` runs `npx tsx`,
+      which downloads tsx at start-up (pre-existing since `de26d26`; backlog).
+
+    **Tests: 283** (237 before, AC-3): +6 uuid, +3 bodyOf, +9 empty-body controller tests, +3 auth (bcrypt), +18
+    JSDoc checker, +8 size checker. **Tests changed because of an upgrade** (the only 2 pre-existing test files
+    touched; no assertion changed):
+    - `order-service/src/controllers/orderController.test.ts`: the request helper takes a `body`, and an
+      empty-body case was added, because Express 5 leaves `req.body` undefined (T030);
+    - `payment-service/src/controllers/paymentController.test.ts`: the request cast is
+      `Request<{ orderId: string }>`, because `@types/express` 5 types `req.params` values as
+      `string | string[]` (T032).
+
+    Re-measured today: `npm outdated` empty (root, `--workspaces --include-workspace-root`, dashboard);
+    `npm audit` 0 (with and without dev; dashboard 0); one major each for express, `@types/express`,
+    typescript, react, vite and react-router; check-docs 113 files, 266 exports, all documented. Smoke test on
+    the rebuilt stack: baseline login 200, products 200, orders 200, no JWT 401, empty login body 400.
+- [x] **T092** — Tick the ACs in `spec.md` and `feature.json` (Status `Implemented`). Update `roadmap.md`/`.json`,
       `memory/progress.md` and `memory/MEMORY.md`. Note that 012 resumes by rebasing onto the upgraded `main`.
+  - **Result (2026-10-25):** ACs 1–13 ticked in `spec.md` and `feature.json`, each with its proof:
+    - AC-1/2: T062 + today; AC-3: T091; AC-4: T060 + T091; AC-5: T061; AC-6: T033; AC-7: T041 (the user);
+      AC-8: T070 + T072; AC-9: T071;
+    - AC-10/11: T076–T082; AC-12: T085/T086, reviewed by the user (two rounds of changes, D-042/D-043);
+      AC-13: T087.
+
+    For AC-9 and AC-13, the manual review was checked against each AC's wording: every step of AC-9 is in the
+    workflow section and linked from the README. Status **Implemented**, stage verified; roadmap 005 ✔️ (`done`).
+    Progress and MEMORY updated. 012 resumes by rebasing `feat/012-assistant-evals-feedback` onto the upgraded
+    `main`.
 
 ## AC coverage
 

@@ -476,3 +476,55 @@ reported as documented.
 header. `export type { … }` lists are skipped like re-exports. Plan §7 updated; each case has a test.
 **Alternatives:** the plan's looser rule (fewer comments to write, but AC-10 asks for a JSDoc block per export).
 **Consequences:** a file with a header and an export right under it needs two comments.
+
+## D-042 — 005 T085: distributed-system rules in the coding standards (2026-10-25)
+
+**Context:** the user reviewed the draft `specs/coding-standards.md` and suggested rules for tracing,
+configuration, Kafka failures, event evolution and contract tests.
+**Decision:** add rules 9–13, each grounded in the repo with an example and a counter-example or a stated gap:
+correlation ID on every hop; fail-fast configuration (safe local defaults allowed, secrets checked); a bad message
+must not stop the consumer (today's log-and-skip); additive event changes (a new closed-set value is not
+additive); a contract test per event. The JSDoc rule becomes 14.
+**Not adopted:** OpenTelemetry (correlation IDs and structured logs suffice; Constitution III); a dead-letter
+topic now (it is new behaviour, so a feature of its own).
+**Consequences:** three gaps to fix go to the backlog in T087: a Kafka dead-letter topic with retry, the outbox
+relay sending the order ID as `correlation-id`, and the `JWT_SECRET` fallback.
+
+## D-043 — 005 T085: naming, structure and resilience rules; rules renumbered (2026-10-25)
+
+**Context:** a second review by the user proposed file-size limits, naming conventions, nesting limits, logging,
+timeouts, retries, circuit breakers, dead-letter queues and event versioning.
+**Decision:** adopted, adapted to the repo, each with a repo example and a counter-example (or a stated gap):
+- **naming:** a conventions table matching what the repo already does;
+- **files:** a 100–200 code-line target with a hard limit of 300 (all 113 files are within 200 today);
+- **one responsibility per file**, instead of one export per file: layered controllers export a handler per
+  route, and `events.ts` is the shared contract;
+- **functions:** nesting ≤ 3 with guard clauses;
+- **logging:** with the correlation ID, no `console.log`;
+- **outbound calls:** timeouts on each, and retries with backoff only for transient failures;
+- **dead-letter topic:** a stated target, not built;
+- **events:** versioned topics for breaking changes.
+
+Rules are renumbered 1–16 (D-042's 9–14 are now 10–16).
+**Not adopted now:** OpenTelemetry (planned; backlog) and a circuit breaker (already in the backlog, P1). Both
+are new behaviour.
+**Consequences:** two more backlog items in T087: OpenTelemetry tracing, and proxy timeouts for every gateway
+route plus Redis command timeouts. The standards apply to new and changed code; existing counter-examples are
+fixed when that code is touched.
+
+## D-044 — 005 T086: constitution 1.1.0 and a file-size gate (2026-10-25)
+
+**Context:** AC-12 asks for the coding standards to be referenced from the constitution with a version bump. The
+user also asked for the file-size rule (standards rule 7) to be checked, not only written down.
+**Decision:**
+- **Constitution 1.0.0 → 1.1.0** (MINOR: a quality gate added, no principle changed). Definition-of-Done item 6
+  says new and changed code follows `specs/coding-standards.md`; `npm run check` enforces its JSDoc and file-size
+  rules, and the rest is checked in review.
+- **File-size gate:** `scripts/check-size.mjs` (rule in `scripts/lib/sizeCheck.mjs`, unit-tested) fails a
+  non-test source file over 300 code lines and warns over 200. Comments and blank lines don't count, so
+  documentation never pushes a file over. `npm run check` has 15 checks.
+
+**Alternatives:** count all lines (would penalise the JSDoc that AC-10 requires); warn only (the user asked for a
+check).
+**Consequences:** the largest file today is 194 code lines, so nothing fails. The naming and nesting rules stay
+review-only (no parser dependency; Constitution III).

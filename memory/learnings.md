@@ -128,3 +128,9 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   line ending (005 T077).
 - Claude Code's Edit tool trims trailing whitespace at the end of `new_string`. An edit whose text ended in
   `export const x = ` lost the space before `(` on the next line. Don't end an edit's text inside a line (005 T077).
+- Dependabot reads `.github/dependabot.yml` only from the default branch. A pushed branch gets no validation and
+  no check run; after the merge, the "Dependabot Updates" workflow appears with one job per `updates` entry, and a
+  failing entry would show there (005 T072).
+- In an npm-workspaces repo, Dependabot security-update jobs aimed at a workspace folder (`/packages/x`) fail with
+  `dependency_file_not_supported`, because the lockfile is at the root. The `npm` entry on `/` covers the
+  workspaces (005 T072).

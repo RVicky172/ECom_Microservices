@@ -114,19 +114,19 @@ the [AI shopping assistant design and plan](docs/ai-shopping-assistant.md).
 | Technology | Version | Purpose |
 |-----------|---------|---------|
 | Node.js | 26 | Runtime for all services (`node:26-alpine` images) |
-| TypeScript | 7.0.2 (root), 5.3.3 (workspace tooling) | Static typing and compilation |
-| Express | 4.x | HTTP framework |
+| TypeScript | 7.x | Static typing and compilation (dev servers run on `tsx`) |
+| Express | 5.x | HTTP framework |
 | KafkaJS | 2.x | Apache Kafka client (producer/consumer) |
 | Knex.js | 3.x | SQL query builder + migrations (PostgreSQL) |
 | Mongoose | 9.x | MongoDB ODM |
-| ioredis | 5.x | Redis client |
+| ioredis | 6.x | Redis client |
 | jsonwebtoken | 9.x | JWT sign/verify |
-| bcryptjs | 2.x | Password hashing |
-| Pino | 9.x | Structured JSON logging |
-| Joi | 17.x | Request validation |
+| bcryptjs | 3.x | Password hashing |
+| Pino | 10.x | Structured JSON logging |
+| Joi | 18.x | Request validation |
 | Axios | 1.x | HTTP client for inter-service calls |
-| http-proxy-middleware | 3.x | API Gateway reverse proxy |
-| uuid | 9.x | Correlation IDs, idempotency keys |
+| http-proxy-middleware | 4.x | API Gateway reverse proxy |
+| `node:crypto` | built in | Random IDs (`randomUUID`) and name-based IDs (shared `uuidV5`) |
 | @anthropic-ai/sdk | 1.x | Claude API client and tool runner (assistant service) |
 | openai | 7.x | OpenAI-compatible client for local models such as LM Studio (assistant service) |
 | Zod | 4.x | Assistant tool input schemas and request validation |
@@ -134,10 +134,10 @@ the [AI shopping assistant design and plan](docs/ai-shopping-assistant.md).
 ### Frontend
 | Technology | Version | Purpose |
 |-----------|---------|---------|
-| React | 18.3.1 | UI library |
-| Vite | 5.4.1 | Build tool / dev server |
-| TypeScript | 5.3.3 | Frontend type checking and build |
-| React Router | 6.x | Client-side routing |
+| React | 19.x | UI library |
+| Vite | 8.x | Build tool / dev server |
+| TypeScript | 7.x | Frontend type checking and build |
+| React Router | 8.x (`react-router`) | Client-side routing |
 | Redux Toolkit + RTK Query | 2.x | Client session state and cached API data |
 | Axios | 1.x | API calls |
 
@@ -154,10 +154,10 @@ the [AI shopping assistant design and plan](docs/ai-shopping-assistant.md).
 ### Testing & Quality
 | Technology | Purpose |
 |-----------|---------|
-| Jest | Unit & integration testing |
-| Supertest | HTTP endpoint testing |
-| ESLint | Linting |
-| Prettier | Code formatting |
+| Vitest 5 | Unit tests (`npm test`, one project per package) |
+| `npm run check` | Fast gate: typechecks, unit tests, JSDoc check, file-size check, spec tracking consistency |
+| Dependabot | Weekly npm and Docker update PRs (`.github/dependabot.yml`) |
+| ESLint, Prettier | Not yet (backlog); coding rules are in [`specs/coding-standards.md`](specs/coding-standards.md) |
 
 ---
 
