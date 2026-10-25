@@ -175,3 +175,127 @@ RVicky172. Supersedes plan §6 of D-014 (topic creation and `fromBeginning` rema
 down; raise the gateway rate limit for measurements.
 **Consequences:** one consumer start path for all saga services, unit-tested with injected Kafka and sleep; a dead
 consumer is visible in `/health`.
+
+## D-016 — 011 assistant policies and handoff scope (2026-10-23)
+
+**Context:** 011's draft spec had seven open questions (Q1–Q7).
+**Decision:** all accepted as proposed:
+- **Policy terms (sample content for this learning store):** returns within 30 days, unused and in original
+  packaging; free shipping over $50, otherwise $5, 3–5 business days, domestic only; 1-year warranty; card payments
+  only, charged when the order is confirmed; cancellation until the order ships; refunds to the original payment
+  method within 5–7 business days.
+- **Handoff destination:** the notification service logs a simulated support email (answers design doc open
+  question 3).
+- **Event contents:** reference, user ID, conversation ID, timestamp, reason category
+  (`customer_request` | `policy_not_covered` | `order_problem` | `other`), a summary of at most 500 characters; no
+  transcript or email address.
+- **When:** handoff only when the customer asks or accepts an offer, at most once per conversation (a repeat
+  returns the same reference).
+- **Measurement:** on LM Studio `qwen/qwen3-30b-a3b-2507`, at least 9/10 grounded and 3/3 no invention; Claude via
+  stubbed unit tests.
+- **Customer:** no customer notification.
+
+**Alternatives:** ticketing or admin page; sending the transcript; model-initiated handoffs.
+**Consequences:** the assistant gains a Kafka producer; shared gains the `assistant.handoff_requested` topic and
+payload; notification handles it.
+
+## D-017 — 011 plan choices (2026-10-23)
+
+**Context:** 011's plan left four points for RVicky172; approved as recommended.
+**Decision:** (1) policies live in `packages/assistant-service/policies/store-policies.md` (shipped by the existing
+Dockerfile); (2) a missing or empty policy file stops the assistant at startup; (3) Claude is covered by a unit test
+that stubs `@anthropic-ai/sdk` (spike first; fallback: test the prompt/tool mapping without the SDK); (4) the chat
+widget labels the handoff tool "Contacting support…". Also planned: `RequestContext` gains `conversationId`;
+handoff publishing is capped at 5 s; the assistant's Kafka producer connects lazily.
+**Alternatives:** `docs/store-policies.md`; starting without policies; live local-model checks only; generic label.
+**Consequences:** the assistant service gains its first unit tests and a Kafka producer.
+
+## D-018 — 011 T001: Claude covered by a stubbed-SDK test (2026-10-23)
+
+**Context:** D-017 (3) asked a spike to decide between stubbing `@anthropic-ai/sdk` and testing only the prompt/tool
+mapping.
+**Decision:** stub the SDK. `vi.mock('@anthropic-ai/sdk')` swaps the default `Anthropic` class for one whose
+`beta.messages.toolRunner` records its params and returns a fake runner; `runTurn` runs unchanged.
+**Alternatives:** the mapping-only fallback (would leave `runTurn` itself untested).
+**Consequences:** `packages/assistant-service/src/agent/providers/anthropic.test.ts` checks the real request shape
+(cached `system`, tool JSON schemas) with no credits; T015 adds the policy and handoff-tool assertions.
+
+## D-019 — 011 T022: handoff edge cases (2026-10-23)
+
+**Context:** the handoff publish is capped at 5 s, and the reference is saved to Redis after publishing.
+**Decision:** (1) if the cap is hit, the customer is told support couldn't be reached and nothing is stored, even
+though KafkaJS may still deliver the event later; a retry then sends a second event with a new reference. (2) If
+the publish succeeds but saving the reference fails, the tool still reports success (the request is out); a repeat
+may send a second event. Both err towards a duplicate support notice, never towards claiming a request was sent
+when it was not (AC-8).
+**Alternatives:** cancelling an in-flight KafkaJS send (not supported); saving before publishing (would make a
+failed publish look sent on a repeat).
+**Consequences:** support may rarely see two handoffs for one conversation; notification dedupes only by event ID.
+
+## D-020 — 011 T032: clarify the policy document instead of more prompt tuning (2026-10-23)
+
+**Context:** after three prompt attempts on Qwen3 30B, uncovered questions passed 3/3 but "Can I pay with PayPal?"
+got "not covered, I don't know" (the model didn't read "card payments only" as a no), and the refund answer kept
+adding "after we receive the returned item", which the document didn't say.
+**Decision (RVicky172):** make the document explicit: "We don't accept any other payment method"; for a return,
+the 5–7 business days start when the returned item is received (new term). Re-run all 15 questions.
+**Alternatives:** accept 9/10 with the gaps noted; keep tuning the prompt (attempt 3 changed nothing).
+**Consequences:** P10's expected facts gain the start point; the edit also exercises AC-1 (document change, no
+code change).
+
+
+## D-021 — 011 T034: the handoff producer makes one bounded attempt (2026-10-24)
+
+**Context:** live run with Kafka stopped: the publish hit the 5 s cap and the customer was told the request was not
+sent, yet the event reached support ~50 s after Kafka came back. KafkaJS gives an idempotent producer unlimited
+retries by default; `Promise.race` only stops waiting, so the send kept retrying.
+**Decision (RVicky172, option A):** the handoff producer is non-idempotent with `retries: 0` on client and
+producer, `connectionTimeout` and `requestTimeout` 1 s: one attempt ends within ~3 s, inside the cap. Shared
+`createKafkaClient`/`createProducer` take optional limits (saga producers unchanged). Duplicates are already
+dropped by the notification service's event-ID check (AC-6).
+**Alternatives:** B: keep retries, say "couldn't confirm" and store the reference (spec change); disconnect the
+producer on timeout (no guarantee a pending retry stops).
+**Consequences:** a transient broker error fails the handoff at once ("try again later") instead of retrying; a
+retry in the same conversation works because nothing is stored on failure. Measured: failure turns 4.0 s
+(stopped) / 4.6 s (paused), 0 late deliveries in 90 s.
+
+## D-022 — 011 T035: hand off on the first ask, and ground product answers explicitly (2026-10-24)
+
+**Context:** T034 showed Qwen3 30B asking "what is it about?" on 2 of 4 first requests for a person (AC-4 wants the
+handoff in that turn). Prompt attempts 1–4 traded that for new faults: a reply claiming "I'll connect you" with no
+tool call, a sample reference copied into a reply with no handoff, and invented branded products for product
+questions.
+**Decision (RVicky172):** add the handoff rule, scoped to requests for a person; never claim connecting or sent
+without a tool result; reply with the tool's reference word for word (no sample reference in the prompt); and a
+grounding rule in "How to work": call `search_products`/`get_product` before naming any product, with a
+vague-question example ("Do you have headphones?"). Examples use different phrases from the live checks.
+**Alternatives:** accept AC-4 at 2/4; a code-level guard that retries an ungrounded reply (new scope).
+**Consequences:** attempt 6 measured 4/4 first-ask handoffs, 7/7 grounded product answers, 10/10 + 3/3 policies, 0
+unasked handoffs. Still prompt-based on one local model: the 012 evals should keep these cases.
+
+## D-023 — 012 spec approved with all proposed answers (2026-10-24)
+
+**Context:** 012 (assistant eval suite, answer feedback, usage analytics; design doc Phase 4, first half) was drafted
+with 12 open questions.
+**Decision (RVicky172):** accept Q1–Q12 as proposed: one feature, evals built first; 50 rule-graded cases (no LLM
+judge), one reply per case per run; target ≥ 90% overall and 100% in safety categories on 2 consecutive runs on
+LM Studio Qwen3 30B; eval data created through the normal APIs; implicit "no handoff" rule on non-handoff cases;
+feedback up/down only; analytics events carry no user ID and no text; a CLI usage report (tokens, no currency); a
+per-user daily token budget goes to the backlog.
+**Alternatives:** split feedback and analytics into 013; an LLM-as-judge grader.
+**Consequences:** Phase 1 exit depends on AC-5; eval runs are manual (CI is in the backlog).
+
+## D-024 — 012 plan decisions, all as recommended (2026-10-24)
+
+**Context:** the 012 plan listed six decision points.
+**Decision (RVicky172):** (1) the eval runner calls assistant-service and the other services directly on their host
+ports with identity headers and `INTERNAL_SERVICE_TOKEN`, not through the gateway (100 req / 15 min per IP); fresh
+per-run eval users, ≤ 25 messages each, keep the 30/hour assistant limit unchanged. (2) Eval rules check tool names
+only; AC-3 narrowed (spec Changelog). (3) SSE `done` gains `answerId` and `usage`; a new `handoff` SSE event is
+emitted after Kafka acknowledges, and the eval grades handoffs with it. (4) The usage report runs inside the
+assistant container (`docker compose exec`), since Kafka advertises only `kafka:9092`. (5) The injection case
+creates and deletes a temporary product through the (still unprotected) product write routes. (6) Eval reports are
+git-ignored; AC-5 summaries go in tasks.md.
+**Alternatives:** gateway calls with a raised limit; tool inputs in SSE; a host Kafka listener; committed reports.
+**Consequences:** ~5 leftover eval users per run in `auth_db`; the injection fixture needs an admin token once
+product writes are protected (backlog).

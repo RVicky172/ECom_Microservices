@@ -28,11 +28,20 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   earlier turns), so long conversations are capped instead of trimmed.
 - Local models (Qwen etc.) write `<think>…</think>` and markdown despite instructions; the OpenAI-compatible
   provider strips reasoning and the chat renders `**bold**` safely.
+- Grounding on Qwen3 30B (011 T032): told "if the policies don't cover it, say so", it still answers uncovered
+  questions with an invented "no, we don't offer X". Spelling out "don't say yes or no; say the policies don't
+  cover it; offer a person" plus an example sentence fixed that, but then "card payments only" was read as silent
+  about PayPal. At temperature 0.3 the answers are near-deterministic, so one run per prompt shows the effect.
 
 ## Tests & build
 
 - Vitest config at the root must be `vitest.config.mts`: the repo is CommonJS (no `"type": "module"`), and a `.ts`
   config prints a Vite "ESM syntax in a file loaded as CommonJS" warning once per project.
+- The root `tsconfig.json` is only a base for the packages (each sets its own `rootDir`/`outDir`/`include`). It
+  used to set `rootDir: ./packages` with no `include`, so the IDE pulled in root files like `vitest.config.mts` and
+  showed TS6059. Now it has no `rootDir`/`outDir` and `"include": ["packages/*/src/**/*"]`. After changing a
+  tsconfig, run "TypeScript: Restart TS Server" (or Reload Window) in VS Code, or the old error stays on screen
+  (fixed 2026-10-23).
 - Vitest's default reporter lists passing files only in a terminal; `reporters: [['default', { summary: false }]]`
   lists every file in piped output too (scripts/check.mjs, CI).
 - `@ecommerce/shared` emits no `.d.ts` (no `declaration` in tsconfig), so services resolve it to `dist/index.js` and
@@ -76,3 +85,27 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
   though Vitest runs it. Use static imports (`vi.mock` is hoisted above them) and put any state the mock factory
   needs in `vi.hoisted(() => …)`. A ~10-line fake of `db(table).where(m).first()` / thenable `where` is enough for
   knex read paths (002).
+- Stubbing Claude: `vi.mock('@anthropic-ai/sdk')` mocks only the package root, so `betaZodTool`
+  (`@anthropic-ai/sdk/helpers/beta/zod`) and `ToolError` stay real. A fake `toolRunner` needs `params`, an async
+  iterator yielding streams (each async-iterable with `finalMessage()`), and `done()` (011 T001,
+  `assistant-service/src/agent/providers/anthropic.test.ts`).
+- A fresh copy of a module per test (to reset module-level state such as a cached Kafka producer): use
+  `vi.resetModules()` then `await vi.importActual<…>('./module')` inside the test. A dynamic `import('./module')`
+  works in Vitest but fails the packages' nodenext typecheck (TS2835, needs `.js`) (011 T013).
+- `Promise.race([work, timeout])` subscribes to `work`, so if the timeout wins, a later rejection of `work` is
+  already handled; no extra `.catch()` is needed to avoid an unhandled rejection (011 T022, checked by a test).
+- ...but the race only stops *waiting*: a KafkaJS `send` that lost the race keeps retrying and can still land.
+  An idempotent KafkaJS producer with no `retry` option retries without limit (`Number.MAX_SAFE_INTEGER`; it
+  refuses `retries: 0`). 011 T034 (2026-10-24): the "failed" handoff reached support ~50 s after Kafka came back.
+  Fix (D-021): non-idempotent producer, `retries: 0`, 1 s connection/request timeouts.
+- LM Studio on the dev machine (RTX 5080, 16 GB): `lms load` defaults (51,968-token context, 4 parallel slots)
+  push part of the 18.6 GB Qwen3 30B model off the GPU, so turns took ~115 s; a JIT-loaded second copy (`…:2`)
+  makes the whole PC lag. Load it as in `docs/lm-studio-setup.md` (16k context, 1 slot) → 0.5–6 s per turn.
+
+- Prompt examples get copied literally by Qwen3 30B: a sample handoff reference (`HO-1A2B3C4D`) in the system
+  prompt appeared in a reply with no handoff behind it (011 T035). Use placeholders, never realistic sample IDs. An
+  imperative "call the tool straight away, before writing anything" for handoffs made it skip `search_products`
+  and invent branded products; scoping the rule to handoffs plus an explicit "look up before naming any product"
+  rule with a vague-question example fixed it (D-022). Re-check product grounding after any prompt change.
+- Measuring chat replies: `chat.mjs` prints a multi-line reply; filtering its output with `grep '^reply'` shows
+  only the first line and hides text written after a tool call (cost a false "reference missing" in T035).

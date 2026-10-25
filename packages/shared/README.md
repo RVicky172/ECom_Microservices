@@ -12,8 +12,8 @@ npm run build --workspace=packages/shared
 
 | Module | What it is for |
 | --- | --- |
-| `src/events.ts` | Kafka topic names, event type names, order statuses, and legal transitions |
-| `src/kafka.ts` | KafkaJS client, producer, and consumer setup |
+| `src/events.ts` | Kafka topic names, event type names, payload types and parsers (saga events and `assistant.handoff_requested`), order statuses, and legal transitions |
+| `src/kafka.ts` | KafkaJS client, producer, and consumer setup; optional timeouts and retry limits for a producer that must give up quickly |
 | `src/jwt.ts` | Shared JWT signing and verification helpers and refresh-cookie name |
 | `src/errors.ts` | Standard application errors and their HTTP status codes |
 | `src/middleware/errorHandler.ts` | Express error-to-response middleware |

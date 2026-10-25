@@ -2,14 +2,16 @@
 
 > Read this first every session. Keep ≤ 40 lines. Rules: `specs/memory-management.md`.
 
-## Current State (2026-10-23)
+## Current State (2026-10-24)
 
 - **Phase:** 1 (Checkout & Assistant). Phase 0 complete 2026-10-23 (CI moved to backlog, D-012). SDD since 2026-10-23 (D-001).
-- **Active feature:** none — 010 saga payloads verified ✔️ 2026-10-23 (Phase 1: 1 of 3; checkout completes end to end).
-  Phase 0 done (000, 001, 002, 004).
-- **Next step:** `/spec-new 011` (assistant: store policies in the prompt, human handoff via Kafka). Saga consumers
-  use shared `startSagaConsumer` (D-015); event payloads live in shared.
-- **Testing:** `npm test` (Vitest, `packages/*/src/**/*.test.ts`, 173 tests); `npm run check` runs it. Node 26
+- **Active feature:** 012 assistant evals + feedback + analytics — 🚧 In Progress 2026-10-24 (spec D-023, plan D-024); tasks.md 0/30
+  (`specs/features/012-assistant-evals-feedback/`). 011 assistant policies + handoff ✔️ Implemented 2026-10-24 (13/13 ACs; D-016–D-022):
+  policies 10/10 + 3/3 on Qwen3, first-ask handoff 4/4, product answers grounded 7/7, Kafka-down safe (D-021).
+  Phase 1: 010 ✔️, 011 ✔️; 012 🚧.
+- **Next step:** `/spec-implement 012` from T001 (LM Studio usage spike) and T002 (direct-call spike). Load LM Studio per
+  `docs/lm-studio-setup.md` before live eval runs. 011 changes are not committed yet.
+- **Testing:** `npm test` (Vitest, `packages/*/src/**/*.test.ts`, 237 tests); `npm run check` runs it. Node 26
   everywhere (D-009).
 - **Tracking:** status lives in `specs/roadmap.json` + `feature.json` too; keep in sync (D-005). View: `npm run dashboard`.
 - **Blockers:** none

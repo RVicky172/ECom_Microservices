@@ -4,7 +4,7 @@
 > Status legend: ⬜ Not started · 📝 Spec drafted · ✅ Spec approved · 🚧 In progress · ✔️ Done
 > Machine-readable copy: `roadmap.json` — keep both in sync (`npm run check` verifies). Live view: `npm run dashboard`.
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-24
 
 ---
 
@@ -32,8 +32,8 @@ _Goal:_ checkout completes end to end through the saga, and the AI assistant rea
 | #   | Feature | Spec | Status |
 | --- | ------- | ---- | ------ |
 | 010 | Saga payloads: align `inventory.reserved` with the payment consumer so checkout reaches `CONFIRMED` | [spec](features/010-saga-payloads/spec.md) | ✔️ |
-| 011 | Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3) | — | ⬜ |
-| 012 | Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4) | — | ⬜ |
+| 011 | Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3) | [spec](features/011-assistant-policies-handoff/spec.md) | ✔️ |
+| 012 | Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4) | [spec](features/012-assistant-evals-feedback/spec.md) | 🚧 |
 
 **Exit criteria:** an order placed in the UI reaches `CONFIRMED` (or `CANCELLED` with a reason) without manual
 steps, and the assistant eval suite passes its agreed target on the configured model.
@@ -42,7 +42,8 @@ steps, and the assistant eval suite passes its agreed target on the configured m
 
 - Protect product write routes (admin role check at the gateway or in product-service).
 - Shared rate limiting (the gateway limiter is per process, in memory).
-- Assistant: `assistant.interaction` analytics events; compaction for long conversations.
+- Assistant: compaction for long conversations (`assistant.interaction` events are in 012).
+- Assistant: per-user daily token budget (design doc §6; deferred from 012 Q12).
 - Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.
 - Server-side price lookup when adding to cart (the cart currently trusts the client's price).
 - Server-side prices when creating an order (the order total is computed from client-sent prices; 000 G8).

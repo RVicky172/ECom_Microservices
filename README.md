@@ -35,6 +35,7 @@ flowchart LR
    assistant -. "read-only tools" .-> order
    assistant --> redis
    assistant <--> claude(("Claude API"))
+   assistant -. "assistant.handoff_requested" .-> kafka
 
    subgraph data[Service-owned data]
       authdb[(Auth DB<br/>PostgreSQL)]
@@ -600,6 +601,16 @@ is not set up and the store works as usual.
    ├─ Success → publishes "payment.completed" → Order → CONFIRMED
    └─ Failure → publishes "payment.failed" → Inventory releases → Order → CANCELLED
 6. Notification Service consumes events → logs confirmation/failure messages
+```
+
+**Support handoff (outside the saga):**
+
+```
+1. Customer asks the assistant for a person (or accepts its offer)
+2. Assistant Service publishes "assistant.handoff_requested"
+   (reference, user ID, conversation ID, reason, short summary; no transcript)
+   └─ Kafka unavailable → the customer is told to try again later; nothing is sent
+3. Notification Service consumes → logs a simulated support email with the reference
 ```
 
 ---

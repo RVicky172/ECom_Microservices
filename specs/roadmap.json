@@ -1,6 +1,6 @@
 {
   "project": "mercato — E-Commerce Microservices Platform",
-  "updated": "2026-10-23",
+  "updated": "2026-10-24",
   "phases": [
     {
       "number": 0,
@@ -49,14 +49,14 @@
         {
           "id": "011",
           "name": "Assistant: store policies in the prompt and human handoff via Kafka (design doc Phase 3)",
-          "status": "not-started",
-          "folder": null
+          "status": "done",
+          "folder": "011-assistant-policies-handoff"
         },
         {
           "id": "012",
           "name": "Assistant: eval suite, answer feedback and usage analytics (design doc Phase 4)",
-          "status": "not-started",
-          "folder": null
+          "status": "in-progress",
+          "folder": "012-assistant-evals-feedback"
         }
       ]
     }
@@ -64,7 +64,8 @@
   "backlog": [
     "Protect product write routes (admin role check at the gateway or in product-service).",
     "Shared rate limiting (the gateway limiter is per process, in memory).",
-    "Assistant: `assistant.interaction` analytics events; compaction for long conversations.",
+    "Assistant: compaction for long conversations (`assistant.interaction` events are in 012).",
+    "Assistant: per-user daily token budget (design doc §6; deferred from 012 Q12).",
     "Update the HLD/LLD `.docx` guide with the assistant service, then regenerate `doc_extract.txt`.",
     "Server-side price lookup when adding to cart (the cart currently trusts the client's price).",
     "Server-side prices when creating an order (the order total is computed from client-sent prices; 000 G8).",
