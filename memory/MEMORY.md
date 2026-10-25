@@ -6,8 +6,8 @@
 
 - **Phase:** 1 (Checkout & Assistant). Phase 0 fully done: exit criteria met 2026-10-23 (CI in backlog, D-012), and 005 ✔️ 2026-10-25. SDD since 2026-10-23 (D-001).
 - **Active feature:** 012 assistant evals + feedback + analytics — 🚧 In Progress (spec D-023, plan D-024); tasks.md 20/30 (T001, T002, T010–T018, T020–T026, T028, T029 done)
-  (`specs/features/012-assistant-evals-feedback/`), local branch `feat/012-assistant-evals-feedback`, pushed as **`origin/feat/012-evals-on-main`**
-  (the old `origin/feat/012-assistant-evals-feedback` holds the pre-rebase history; replacing it needs the user's force-push). **`main` merged in 2026-10-25** (005 upgrades + standards), so 012 now
+  (`specs/features/012-assistant-evals-feedback/`), branch **`feat/012-evals-on-main`** (local and origin; the old
+  `feat/012-assistant-evals-feedback` and the merged 005 branches were deleted 2026-10-25). **`main` merged in 2026-10-25** (005 upgrades + standards), so 012 now
   runs on Express 5, React 19, TS 7 and must pass check-docs + check-size and follow `specs/coding-standards.md`.
 - **Done:** 011 ✔️ (PR #1, `f6a355c`); 005 ✔️ Implemented 2026-10-25, 13/13 ACs (PR #2 `fa27285` upgrades, PR #3 `60f6041` standards/records).
   005 left: `specs/coding-standards.md` (16 rules, constitution 1.1.0, D-044), Dependabot (alerts + security updates on), 15-check gate.
