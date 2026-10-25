@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fast quality gate: typechecks every package in packages/, runs their unit
- * tests and the JSDoc check (in parallel), and, when the spec dashboard is installed, runs its
+ * tests, the JSDoc check and the file-size check (in parallel), and, when the spec dashboard is installed, runs its
  * typecheck and tests — which include the check that specs/*.json tracking
  * files agree with the Markdown specs (feature 004, AC-9).
  *
@@ -31,6 +31,8 @@ const jobs = packages.map((name) => run(`typecheck ${name}`, `npx tsc --noEmit -
 jobs.push(run('unit tests', 'npx vitest run'));
 // Every source file has a header and every export a JSDoc block (feature 005, AC-11).
 jobs.push(run('doc comments (check-docs)', 'node scripts/check-docs.mjs'));
+// No source file over 300 code lines (coding standards rule 7).
+jobs.push(run('file size (check-size)', 'node scripts/check-size.mjs'));
 
 if (existsSync(join(dashboard, 'node_modules', 'vitest'))) {
   jobs.push(run('spec-dashboard (typecheck, tests, tracking files)', 'npm run check --silent', dashboard));

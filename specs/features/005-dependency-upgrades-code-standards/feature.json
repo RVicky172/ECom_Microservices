@@ -3,8 +3,8 @@
   "folder": "005-dependency-upgrades-code-standards",
   "title": "Dependency Upgrades, Dependabot, JSDoc and Clean-Code Rules",
   "phase": 0,
-  "status": "in-progress",
-  "stage": "implementing",
+  "status": "implemented",
+  "stage": "verified",
   "created": "2026-10-24",
   "updated": "2026-10-25",
   "summary": "Upgrade every npm package to its latest stable version with the store's behaviour unchanged, set up Dependabot for version and security updates, document every source file and export with JSDoc (checked by npm run check), and write coding standards with the design patterns this repo uses.",
@@ -13,79 +13,79 @@
       "id": "AC-1",
       "text": "npm outdated (root, workspaces, spec dashboard) shows nothing behind latest stable, except agreed and listed exceptions.",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-2",
       "text": "Deprecated @types/ioredis and @types/uuid removed; no declared library (or its @types) installed in two majors; upstream-pinned transitive duplicates listed, not overridden.",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-3",
       "text": "npm run check and npm run build pass; unit tests ≥ 237; tests changed for an upgrade listed with reasons.",
       "test": "unit + manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-4",
       "text": "Every service image rebuilds from clean; 10/10 health checks healthy.",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-5",
       "text": "End to end as before: pre-upgrade user signs in, register, products, cart, order CONFIRMED/CANCELLED, assistant turn (ratings checked by 012).",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-6",
       "text": "Gateway protections unchanged: 401 without JWT, 429 on the 101st request in 15 min, 502 within the timeout with a service stopped, recovery after (no circuit breaker exists; P1).",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-7",
       "text": "Storefront builds with new React, router and Vite; all 6 pages load with no console errors.",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-8",
       "text": ".github/dependabot.yml covers npm (root, spec dashboard) and Docker, weekly, grouped minor/patch, majors separate; GitHub shows no config errors.",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-9",
       "text": "Docs describe reviewing a Dependabot PR locally without CI.",
       "test": "manual review",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-10",
       "text": "Every non-test source file has a header comment and every export a JSDoc block (today 87/124 files and 151/317 exports lack them; after: 0 and 0).",
       "test": "manual measurement",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-11",
       "text": "npm run check fails on a missing header or export JSDoc, naming file and line; the checker is unit-tested.",
       "test": "unit",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-12",
       "text": "Coding-standards doc with patterns and clean-code rules, each with a repo example; referenced by the constitution (version bump), CLAUDE.md and the workflow.",
       "test": "manual review",
-      "done": false
+      "done": true
     },
     {
       "id": "AC-13",
       "text": "Records updated: tech-stack versions, one decision per major upgrade (D-029 superseded), learnings, roadmap backlog.",
       "test": "manual review",
-      "done": false
+      "done": true
     }
   ],
   "tasks": [
@@ -260,7 +260,8 @@
     {
       "id": "T072",
       "title": "Dependabot config shows no errors on GitHub",
-      "done": false
+      "done": true,
+      "result": "PR #2 merged; Dependabot ran the 3 configured jobs, all success; alerts 26 -> 0; security updates on"
     },
     {
       "id": "T075",
@@ -313,32 +314,38 @@
     {
       "id": "T085",
       "title": "specs/coding-standards.md",
-      "done": false
+      "done": true,
+      "result": "coding-standards.md: 6 patterns, 8 rules with repo examples; 58 file:line refs verified"
     },
     {
       "id": "T086",
       "title": "Reference the standards (constitution 1.1.0, CLAUDE.md, workflow, architecture)",
-      "done": false
+      "done": true,
+      "result": "constitution 1.1.0 + DoD item 6, CLAUDE.md, workflow, architecture; plus file-size gate (15 checks, D-044)"
     },
     {
       "id": "T087",
       "title": "Records: tech stack, learnings, backlog, decisions",
-      "done": false
+      "done": true,
+      "result": "tech-stack updated, not-used table filled, 6 backlog items, Dependabot learnings, one decision per major"
     },
     {
       "id": "T090",
       "title": "Update architecture.md",
-      "done": false
+      "done": true,
+      "result": "architecture.md: bodyOf, uuidV5, no breaker, 15-check gate; README tech tables corrected"
     },
     {
       "id": "T091",
       "title": "Definition-of-Done gates",
-      "done": false
+      "done": true,
+      "result": "check 15/15, build 0, 283 tests (>= 237), 10/10 /health on rebuilt images; 2 test files changed for the upgrade"
     },
     {
       "id": "T092",
       "title": "Tick ACs, Implemented, roadmap and memory",
-      "done": false
+      "done": true,
+      "result": "13/13 ACs ticked; Implemented; roadmap, progress and memory updated"
     }
   ],
   "openQuestions": [

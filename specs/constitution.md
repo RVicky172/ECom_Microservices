@@ -3,7 +3,7 @@
 > The non-negotiable principles of this project. Every spec, plan, task, and line of code must comply.
 > If a change needs to break a principle, amend this document first (see "Governance & Amendments").
 
-**Version:** 1.0.0 · **Ratified:** 2026-10-23
+**Version:** 1.1.0 · **Ratified:** 2026-10-23 · **Amended:** 2026-10-25
 
 ---
 
@@ -65,6 +65,9 @@ A feature is **Done** when all are true:
 
 5. If the feature changes a service, `docker compose up -d --build <service>` starts it and its `/health`
    check reports healthy.
+6. **Coding standards:** new and changed code follows `specs/coding-standards.md` (design patterns,
+   clean-code, distributed-system and documentation rules). `npm run check` enforces its JSDoc and file-size
+   rules; the rest is checked in review.
 
 ## Governance & Amendments
 

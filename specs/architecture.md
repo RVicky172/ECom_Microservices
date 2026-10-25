@@ -13,7 +13,7 @@ Point-in-time record of every service, route, event and known gap at the start o
 ```
 Microservices/
 ├── packages/
-│   ├── shared/               # events/topics, errors, JWT, Kafka, logger, Express middleware
+│   ├── shared/               # events/topics, errors, JWT, Kafka, logger, Express middleware, bodyOf, uuidV5
 │   ├── api-gateway/          # :4000 the only public API: CORS, CSRF, rate limit, JWT, reverse proxy
 │   ├── auth-service/         # :4001 users, login, access JWT + rotating refresh cookie (PostgreSQL)
 │   ├── product-service/      # :4002 catalog (MongoDB) with Redis cache-aside
@@ -26,9 +26,10 @@ Microservices/
 │   └── frontend/             # :3000 React + Vite SPA (React Router, Redux Toolkit Query)
 ├── docs/                     # design documents (ai-shopping-assistant.md)
 ├── tools/spec-dashboard/     # :3100 local Next.js dashboard for specs/ and memory/ (own package, not a workspace)
-├── scripts/                  # DB init, seed data, check.mjs (fast gate: typecheck + unit tests)
+├── scripts/                  # DB init, seed data, check.mjs (fast gate: typecheck, unit tests, JSDoc and size checks)
 ├── vitest.config.mts         # unit tests: one Vitest project per packages/* directory
 ├── specs/ · memory/          # spec-driven workflow and project memory; specs/*.json = tracking state
+├── .github/dependabot.yml    # weekly npm (root, dashboard) and Docker update PRs (005)
 ├── docker-compose.yml        # full stack · docker-compose.infra.yml: infrastructure only
 └── .env.example              # every environment variable, documented
 ```
@@ -50,6 +51,9 @@ strips any client-sent `x-user-*` headers, and forwards `x-user-id`, `x-user-ema
 | `/api/v1/assistant` | assistant | Bearer JWT; streams Server-Sent Events |
 
 Inventory has no gateway route; it is reached internally and through Kafka.
+
+The gateway has **no circuit breaker** (005 removed the unused `opossum`; backlog). A stopped service answers
+502 from the proxy's error handler, and only the assistant route sets a proxy timeout (`ASSISTANT_TIMEOUT_MS`).
 
 ### Checkout saga (Kafka, choreography)
 
@@ -112,7 +116,9 @@ Details: `packages/frontend/README.md`.
   this layout, a `Dockerfile`, a compose entry with a health check, and a `README.md` learning guide.
 - **Errors:** throw `AppError` subclasses from `@ecommerce/shared` (`NotFoundError`, `ValidationError`, …); the
   shared `errorHandler` turns them into `{ error: { code, message }, correlationId }`.
-- **Validation:** Joi in existing services; Zod in the assistant service.
+- **Validation:** Joi in existing services; Zod in the assistant service. On Express 5 a request without a body has
+  `req.body === undefined`, which Joi accepts, so validate `bodyOf(req)` from `@ecommerce/shared` (`{}` when
+  absent), never `req.body` directly (005).
 - **Configuration:** environment variables with safe local defaults; every variable is listed in `.env.example`.
 - **Logging:** `createLogger(<service>)` (Pino JSON) with `correlationId` on every request log; never log
   secrets, tokens or full chat text.
@@ -123,10 +129,17 @@ Details: `packages/frontend/README.md`.
   over HTTP as the user (forwarded `x-user-id`, `x-correlation-id`, `x-internal-token`). Example: payment calls
   order `GET /orders/:id` before showing a payment (002).
 - **Docs:** each package has a `README.md` learning guide; update it when routes, env vars or behaviour change.
-- **TypeScript:** JSDoc on exported functions and components; match the surrounding code's style.
+- **TypeScript:** follow `specs/coding-standards.md`: a header on every file and JSDoc on every export, files
+  within 300 code lines (both checked by `npm run check`), and match the surrounding code's style.
 - **Tests:** unit tests live next to the code as `src/**/*.test.ts` (`specs/testing-strategy.md`). Each `tsc`-built
   package has `tsconfig.json` (typecheck, tests included) and `tsconfig.build.json` (build, tests excluded); its
   `build` script uses the latter. The root `.dockerignore` keeps `*.test.ts` out of images.
 - **Order state machine:** check transitions with `canTransitionOrder(from, to)` from `@ecommerce/shared`, never by
   reading `VALID_ORDER_TRANSITIONS` inline.
-- **Runtime:** Node 26 everywhere (`node:26-alpine` images, root `engines` `>=26.0.0`; D-009).
+- **IDs:** random IDs with `crypto.randomUUID()`; name-based (v5) IDs with `uuidV5` from `@ecommerce/shared`, e.g.
+  payment's outcome event IDs (D-034). There is no `uuid` package.
+- **Fast gate:** `npm run check` (`scripts/check.mjs`) runs the typechecks, the unit tests, the JSDoc check
+  (`scripts/check-docs.mjs`), the file-size check (`scripts/check-size.mjs`) and the dashboard's tracking
+  consistency, 15 checks in all (005).
+- **Runtime:** Node 26 everywhere (`node:26-alpine` images, root `engines` `>=26.0.0`; D-009); TypeScript 7,
+  dev servers on `tsx` (D-033).

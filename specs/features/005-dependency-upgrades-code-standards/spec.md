@@ -1,6 +1,6 @@
 # 005 — Dependency Upgrades, Dependabot, JSDoc and Clean-Code Rules
 
-**Status:** In Progress <!-- Draft | Approved | In Progress | Implemented | Superseded -->
+**Status:** Implemented <!-- Draft | Approved | In Progress | Implemented | Superseded -->
 **Roadmap phase:** 0 · **Created:** 2026-10-24 · **Owner:** RVicky172
 
 ## Summary
@@ -61,19 +61,19 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
 
 ### Upgrades
 
-- [ ] **AC-1:** After the upgrade, `npm outdated` across the root, every workspace and `tools/spec-dashboard`
+- [x] **AC-1:** After the upgrade, `npm outdated` across the root, every workspace and `tools/spec-dashboard`
   reports no package behind its latest stable version. The only exceptions are the ones listed in this spec with a
   reason, agreed under Q3. _(manual measurement: the command output recorded in tasks.md)_
-- [ ] **AC-2:** The deprecated stub packages `@types/ioredis` and `@types/uuid` are removed, and no library that a
+- [x] **AC-2:** The deprecated stub packages `@types/ioredis` and `@types/uuid` are removed, and no library that a
   `package.json` in this repo declares (nor its `@types` package) is installed in two majors (for example
   `@types/express` 4 and 5). A transitive package held on an older major by an upstream package's own range is
   out of scope: it is listed in tasks.md, not forced with `overrides`. _(manual measurement: `npm ls`)_
-- [ ] **AC-3:** `npm run check` and `npm run build` pass, and the unit-test count is at least the count before the
+- [x] **AC-3:** `npm run check` and `npm run build` pass, and the unit-test count is at least the count before the
   upgrade (237 on the 005 branch base, 2026-10-25; 012's tests are not on `main` yet, Q2). Every test changed because of an upgrade's API is listed in tasks.md with the
   reason. _(unit + manual measurement)_
-- [ ] **AC-4:** Every service image rebuilds from clean, and all 10 `/health` checks report healthy.
+- [x] **AC-4:** Every service image rebuilds from clean, and all 10 `/health` checks report healthy.
   _(manual measurement)_
-- [ ] **AC-5:** The store behaves as before, checked end to end on the rebuilt stack:
+- [x] **AC-5:** The store behaves as before, checked end to end on the rebuilt stack:
   - a user registered **before** the upgrade can still sign in (password hashes stay valid);
   - a new user can register and sign in;
   - products list and search work;
@@ -83,7 +83,7 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
     upgraded stack; P5).
 
   _(manual measurement, recorded in tasks.md)_
-- [ ] **AC-6:** The gateway's protections behave as before:
+- [x] **AC-6:** The gateway's protections behave as before:
   - a protected route without a JWT returns 401;
   - the 101st request within 15 minutes from one IP returns 429;
   - with a service stopped, its route returns 502 within the configured timeout, and works again once the
@@ -91,38 +91,38 @@ The records (`tech-stack.md`, `decisions.md`, `learnings.md`, roadmap) are updat
     and a breaker goes to the backlog; P1.)
 
   _(manual measurement)_
-- [ ] **AC-7:** The storefront builds with the new React, router and Vite. Each of its 6 pages loads in a browser
+- [x] **AC-7:** The storefront builds with the new React, router and Vite. Each of its 6 pages loads in a browser
   with no errors in the console. _(manual measurement)_
 
 ### Dependabot
 
-- [ ] **AC-8:** `.github/dependabot.yml` is committed and covers:
+- [x] **AC-8:** `.github/dependabot.yml` is committed and covers:
   - npm for the root workspace (all `packages/*`) and for `tools/spec-dashboard`;
   - Docker for every Dockerfile's base image;
   - a weekly schedule, with minor and patch updates grouped per ecosystem and each major as its own PR (Q5).
 
   After it is pushed, GitHub's Dependabot tab for the repository shows the configuration with no errors.
   _(manual measurement)_
-- [ ] **AC-9:** The repository docs say how to review a Dependabot pull request without CI (Q6): check it out,
+- [x] **AC-9:** The repository docs say how to review a Dependabot pull request without CI (Q6): check it out,
   `npm ci`, `npm run check`, `npm run build`, rebuild the affected images and check `/health`, and add a
   `decisions.md` entry for a major version. _(manual review)_
 
 ### Documentation and coding rules
 
-- [ ] **AC-10:** Every non-test `.ts` / `.tsx` file under `packages/*/src` starts with a doc comment saying what
+- [x] **AC-10:** Every non-test `.ts` / `.tsx` file under `packages/*/src` starts with a doc comment saying what
   the file is for, and every exported function, class, constant, interface, type and enum has a JSDoc block.
   Measured today: 87 of 124 files have no header and 151 of 317 exports are undocumented; after this feature, both
   are 0. _(manual measurement with the checker in AC-11)_
-- [ ] **AC-11:** `npm run check` fails when a source file or an exported declaration has no doc comment, naming
+- [x] **AC-11:** `npm run check` fails when a source file or an exported declaration has no doc comment, naming
   the file and line. The checker is unit-tested: it is seen failing on a file without a header and on an
   undocumented export, and passing on a documented one. _(unit)_
-- [ ] **AC-12:** A coding-standards document exists. For each design pattern the repo uses, and each clean-code
+- [x] **AC-12:** A coding-standards document exists. For each design pattern the repo uses, and each clean-code
   rule, it gives at least one example taken from this repository. The constitution references it, with a version
   bump recorded in `decisions.md`; so do `CLAUDE.md` and the spec workflow. _(manual review)_
 
 ### Records
 
-- [ ] **AC-13:** The records match the new state:
+- [x] **AC-13:** The records match the new state:
   - `specs/tech-stack.md` lists the new major versions;
   - `memory/decisions.md` has one entry per major upgrade, with the breaking changes that applied here and how
     they were handled, and marks D-029 superseded;
@@ -215,3 +215,15 @@ Number them so answers can be referenced (Q1, Q2…). Each with a proposed defau
 - 2026-10-25 — AC-2 narrowed (user's call at T062): it covers the libraries our `package.json`s declare and their
   `@types`. Transitive duplicates pinned by upstream ranges (`mime-types` 2/3, `picomatch` 2/4) are recorded in
   tasks.md, not overridden.
+- 2026-10-25 — Q9's rules extended after the user's review of the draft standards (D-042): 5 distributed-system
+  rules (correlation IDs on every hop, fail-fast configuration, poison messages, additive event changes, event
+  contract tests). The gaps they expose (no dead-letter topic, the outbox's correlation ID, the `JWT_SECRET`
+  fallback) go to the backlog, not into this feature.
+- 2026-10-25 — Standards extended again at the user's request (D-043): a naming-conventions table, file size
+  (100–200 code lines, hard limit 300) and one responsibility per file, nesting ≤ 3, logging with the
+  correlation ID, outbound timeouts and retries, and versioned topics for breaking event changes. Rules are
+  renumbered 1–16. OpenTelemetry is planned for later (backlog).
+- 2026-10-25 — A file-size gate joins `npm run check` at the user's request (rule 7: fail over 300 code lines,
+  warn over 200), so the check has 15 gates. The constitution is at 1.1.0 with a "Coding standards" quality gate
+  (D-044).
+- 2026-10-25 — Verified: all 13 ACs proven (T091–T092); Status Implemented.
