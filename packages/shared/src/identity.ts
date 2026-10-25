@@ -1,3 +1,7 @@
+/**
+ * Who is calling: helpers for the user identity the gateway forwards in `x-user-id`, and for the UUIDs services
+ * receive as IDs.
+ */
 import type { Request } from 'express';
 import { UnauthorizedError } from './errors';
 

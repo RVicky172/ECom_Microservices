@@ -1,5 +1,7 @@
+/** Auth's PostgreSQL connection and schema (`users`, `refresh_sessions`). */
 import knex from 'knex';
 
+/** The knex connection to `auth_db`, configured from the `POSTGRES_*` variables. */
 export const db = knex({
   client: 'pg',
   connection: {
@@ -12,6 +14,7 @@ export const db = knex({
   pool: { min: 2, max: 10 },
 });
 
+/** A `users` row. `password_hash` is a bcrypt hash and never leaves the service. */
 export interface User {
   id: string;
   email: string;
@@ -22,6 +25,7 @@ export interface User {
   updated_at: Date;
 }
 
+/** Creates the tables if they are missing. Run once at startup. */
 export const runMigrations = async (): Promise<void> => {
   const hasTable = await db.schema.hasTable('users');
   if (!hasTable) {

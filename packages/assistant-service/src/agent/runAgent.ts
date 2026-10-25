@@ -28,8 +28,10 @@ export const provider: AssistantProvider = (() => {
   return selected;
 })();
 
+/** True when the selected provider has what it needs (an API key or a server URL). */
 export const isConfigured = (): boolean => provider.isConfigured();
 
+/** Runs one chat turn on the selected provider with the store tools for this request's user. */
 export const runAgentTurn = (options: {
   history: unknown[];
   userMessage: string;

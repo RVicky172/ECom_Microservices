@@ -1,3 +1,4 @@
+/** Typed Redux hooks; use these instead of the plain `useDispatch` and `useSelector`. */
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from './store';
 

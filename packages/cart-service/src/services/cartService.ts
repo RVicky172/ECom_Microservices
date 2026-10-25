@@ -1,3 +1,4 @@
+/** The shopping cart, kept in Redis. Each write returns the whole cart with its total and item count. */
 import Redis from 'ioredis';
 import { NotFoundError } from '@ecommerce/shared';
 
@@ -28,6 +29,7 @@ const cartKey = (userId: string): string => `cart:${userId}`;
  * Redis is ideal for cart: fast reads/writes, built-in TTL, no need for ACID transactions.
  */
 
+/** The user's cart with its total and item count. */
 export const getCart = async (userId: string): Promise<Cart> => {
   const cart = await redis.hgetall(cartKey(userId));
   const items = Object.values(cart).map((item) => JSON.parse(item));
@@ -35,6 +37,7 @@ export const getCart = async (userId: string): Promise<Cart> => {
   return { userId, items, total: Math.round(total * 100) / 100, itemCount: items.length };
 };
 
+/** Adds an item (or adds to its quantity) and renews the cart's 7-day expiry. */
 export const addItem = async (userId: string, item: CartItem): Promise<Cart> => {
   const key = cartKey(userId);
   const existing = await redis.hget(key, item.productId);
@@ -58,6 +61,11 @@ export const addItem = async (userId: string, item: CartItem): Promise<Cart> => 
   return getCart(userId);
 };
 
+/**
+ * Sets an item's quantity; 0 removes it.
+ *
+ * @throws NotFoundError when the item isn't in the cart
+ */
 export const updateItemQuantity = async (userId: string, productId: string, quantity: number): Promise<Cart> => {
   const key = cartKey(userId);
   const existing = await redis.hget(key, productId);
@@ -75,6 +83,11 @@ export const updateItemQuantity = async (userId: string, productId: string, quan
   return getCart(userId);
 };
 
+/**
+ * Removes an item.
+ *
+ * @throws NotFoundError when the item isn't in the cart
+ */
 export const removeItem = async (userId: string, productId: string): Promise<Cart> => {
   const key = cartKey(userId);
   const removed = await redis.hdel(key, productId);
@@ -82,6 +95,7 @@ export const removeItem = async (userId: string, productId: string): Promise<Car
   return getCart(userId);
 };
 
+/** Deletes the whole cart. */
 export const clearCart = async (userId: string): Promise<Cart> => {
   await redis.del(cartKey(userId));
   return { userId, items: [], total: 0, itemCount: 0 };

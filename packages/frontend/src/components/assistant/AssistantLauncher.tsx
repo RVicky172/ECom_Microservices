@@ -1,3 +1,4 @@
+/** The shopping assistant's launcher button. */
 import { useState } from 'react';
 import { useAssistantChat } from '../../hooks/useAssistantChat';
 import { useSession } from '../../hooks/useSession';

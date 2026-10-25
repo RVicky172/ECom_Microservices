@@ -1,3 +1,4 @@
+/** Payments: a simulated, idempotent charge per order, and owner-only reads. */
 import { db } from '../models/paymentModel';
 import { ConflictError, NotFoundError, isUuid } from '@ecommerce/shared';
 import { isOrderOwnedBy } from '../clients/orderClient';

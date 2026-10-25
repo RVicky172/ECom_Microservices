@@ -1,3 +1,4 @@
+/** Per-IP rate limiting for the gateway, kept in memory (one gateway instance). */
 import { Request, Response, NextFunction } from 'express';
 import { Logger } from 'pino';
 
@@ -12,6 +13,10 @@ interface RateLimitInfo {
 
 const ipMap = new Map<string, RateLimitInfo>();
 
+/**
+ * Allows `RATE_LIMIT_MAX_REQUESTS` (100) requests per IP in each `RATE_LIMIT_WINDOW_MS` (15 minutes) window,
+ * then answers 429 with `Retry-After` until the window ends. Counts reset when the gateway restarts.
+ */
 export const rateLimiter = (logger: Logger) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';

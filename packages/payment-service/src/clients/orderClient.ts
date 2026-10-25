@@ -1,3 +1,4 @@
+/** HTTP client for the order service, used to check who owns an order. */
 import { AppError, INTERNAL_TOKEN_HEADER } from '@ecommerce/shared';
 
 const TIMEOUT_MS = 3000;

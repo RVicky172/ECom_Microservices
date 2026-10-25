@@ -1,3 +1,4 @@
+/** Routes under `/api/v1/products`. */
 import express from 'express';
 import * as productController from '../controllers/productController';
 

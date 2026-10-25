@@ -1,3 +1,4 @@
+/** The `/cart` page. */
 import { CartPanel } from '../components/CartPanel';
 
 /** `/cart`. The cart and checkout on their own. */

@@ -1,5 +1,7 @@
+/** Payment's PostgreSQL connection and schema (`payments`, `idempotency_keys`). */
 import knex from 'knex';
 
+/** The knex connection to `payment_db`, configured from the `POSTGRES_*` variables. */
 export const db = knex({
   client: 'pg',
   connection: {
@@ -12,6 +14,7 @@ export const db = knex({
   pool: { min: 2, max: 10 },
 });
 
+/** Creates the tables if they are missing. Run once at startup. */
 export const runMigrations = async (): Promise<void> => {
   if (!(await db.schema.hasTable('payments'))) {
     await db.schema.createTable('payments', (table) => {

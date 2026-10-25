@@ -8,15 +8,13 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
-    "pino": "^9.4.0",
-    "joi": "^17.13.3",
-    "uuid": "^9.0.1",
-    "jsonwebtoken": "^9.0.2"
+    "pino": "^10.4.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/uuid": "^10.0.0",
     "typescript": "^7.0.2"
   }
 }

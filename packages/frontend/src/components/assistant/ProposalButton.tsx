@@ -1,3 +1,4 @@
+/** The "Add to cart" button for an assistant suggestion. */
 import { useState } from 'react';
 import { useAddCartItemMutation } from '../../api/storeApi';
 import type { CartProposal } from '../../types/assistant';

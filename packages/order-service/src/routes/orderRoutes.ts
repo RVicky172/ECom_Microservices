@@ -1,3 +1,4 @@
+/** Routes under `/api/v1/orders`. */
 import express from 'express';
 import * as orderController from '../controllers/orderController';
 

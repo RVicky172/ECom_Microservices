@@ -1,9 +1,13 @@
+/**
+ * The services' last Express middleware: turns any thrown error into the platform's JSON error response.
+ */
 import { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import { Logger } from 'pino';
 import { AppError } from '../errors';
 
 /**
- * Centralized error-handling middleware.
+ * Logs the error with its correlation ID, then answers `{ error: { code, message }, correlationId }`. An
+ * `AppError` keeps its status and message; anything else is a 500 whose message is hidden from the client.
  */
 export const errorHandler = (logger: Logger): ErrorRequestHandler => {
   return (err: Error | AppError, req: Request, res: Response, _next: NextFunction) => {
@@ -34,4 +38,5 @@ export const errorHandler = (logger: Logger): ErrorRequestHandler => {
   };
 };
 
+/** The same middleware under its older name. */
 export const errorHandlerMiddleware: (logger: Logger) => ErrorRequestHandler = errorHandler;

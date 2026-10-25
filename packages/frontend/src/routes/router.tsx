@@ -8,7 +8,7 @@
  *     /orders         OrdersPage   – order history
  *   anything else     redirect to /catalog
  */
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { StoreLayout } from '../layouts/StoreLayout';
 import { CartPage } from '../pages/CartPage';
 import { CatalogPage } from '../pages/CatalogPage';
@@ -17,6 +17,7 @@ import { OrdersPage } from '../pages/OrdersPage';
 import { paths, type RouteHandle } from './paths';
 import { RequireAuth } from './RequireAuth';
 
+/** The browser router for the table above; `App` renders it. */
 export const router = createBrowserRouter([
   { path: paths.login, element: <LoginPage /> },
   {

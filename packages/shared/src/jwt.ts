@@ -1,8 +1,14 @@
+/**
+ * Access tokens: signing (auth service) and verifying (gateway) with one shared secret.
+ */
 import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 
+/** The HMAC secret for access tokens. The fallback is for local development only; set `JWT_SECRET` elsewhere. */
 export const JWT_SECRET: Secret = process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production';
+/** Name of the httpOnly cookie holding the refresh token. */
 export const REFRESH_COOKIE_NAME = 'refresh_token';
 
+/** What an access token carries about its user. */
 export interface JwtPayload {
   id: string;
   email: string;

@@ -1,3 +1,4 @@
+/** Per-user usage limits for the assistant, kept in Redis. */
 import { config } from '../config';
 import { redis } from './redis';
 

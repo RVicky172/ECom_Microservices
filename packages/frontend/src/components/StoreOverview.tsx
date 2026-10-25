@@ -1,3 +1,4 @@
+/** The catalog page's banner and headline counts. */
 import { useStoreCounts } from '../hooks/useStoreCounts';
 
 /** Left-pad a count to two digits, e.g. `7` → `"07"`. */

@@ -1,5 +1,10 @@
+/** The catalog's MongoDB model. */
 import mongoose, { Schema, Document } from 'mongoose';
 
+/**
+ * A product document. `isActive: false` hides it from the catalog; `stockHint` is display-only, the inventory
+ * service holds the real stock.
+ */
 export interface IProduct extends Document {
   name: string;
   description: string;

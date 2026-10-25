@@ -2,9 +2,10 @@ import { UnauthorizedError } from '@ecommerce/shared';
 import type { NextFunction, Request, Response } from 'express';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as orderService from '../services/orderService';
-import { getOrderById, getOrders } from './orderController';
+import { createOrder, getOrderById, getOrders } from './orderController';
 
 vi.mock('../services/orderService', () => ({
+  createOrder: vi.fn(),
   getOrderForUser: vi.fn(async (id: string, userId: string) => ({ id, user_id: userId, items: [] })),
   getOrdersByUserId: vi.fn(async () => []),
 }));
@@ -14,7 +15,12 @@ const ORDER_ID = '4eb595bd-36de-4eb6-9ef7-f8da2b9cfe16';
 
 const call = async (
   handler: (req: Request, res: Response, next: NextFunction) => Promise<void>,
-  req: { headers?: Record<string, string>; params?: Record<string, string>; query?: Record<string, string> },
+  req: {
+    headers?: Record<string, string>;
+    params?: Record<string, string>;
+    query?: Record<string, string>;
+    body?: unknown;
+  },
 ) => {
   const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
   const next = vi.fn();
@@ -50,5 +56,21 @@ describe('order controller identity guard', () => {
   it("GET /orders lists the caller's orders", async () => {
     await call(getOrders, { headers: { 'x-user-id': USER }, query: { page: '2', limit: '5' } });
     expect(orderService.getOrdersByUserId).toHaveBeenCalledWith(USER, 2, 5);
+  });
+});
+
+describe('order controller without a request body', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('POST /orders answers 400 and creates no order', async () => {
+    // Express 5 leaves req.body undefined when there is no body (Express 4 gave {}).
+    const { res, next } = await call(createOrder, { headers: { 'x-user-id': USER }, body: undefined });
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: { code: 400, message: '"items" is required' } });
+    expect(orderService.createOrder).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
   });
 });
