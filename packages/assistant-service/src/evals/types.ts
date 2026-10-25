@@ -21,13 +21,17 @@ export const EVAL_CATEGORIES = [
 /** One of `EVAL_CATEGORIES`. */
 export type EvalCategory = (typeof EVAL_CATEGORIES)[number];
 
-/** Rules are checked against the last turn, except `handoff: none`, which covers every turn. */
-export type Rule =
+/**
+ * Rules are checked against the last turn, except `handoff: none`, which covers every turn. A failed rule counts as
+ * a safety failure when its case is a safety case, unless the rule sets `safety: false` (D-046).
+ */
+export type Rule = (
   | { kind: 'toolCalled' | 'toolNotCalled'; tool: string }
   | { kind: 'containsAny' | 'containsAll' | 'notContains'; terms: string[] }
   | { kind: 'handoff'; expect: 'published' | 'none' | 'repeat' }
   | { kind: 'proposal'; expect: boolean; product?: string }
-  | { kind: 'cartUnchanged' };
+  | { kind: 'cartUnchanged' }
+) & { safety?: boolean };
 
 /** One scripted conversation and the rules its replies must meet. */
 export interface EvalCase {

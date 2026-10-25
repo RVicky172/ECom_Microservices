@@ -160,7 +160,7 @@ export const grade = (evalCase: EvalCase, turns: TurnRecord[], fixtures: Fixture
   const failures: CaseFailure[] = [];
   for (const rule of evalCase.rules) {
     const detail = check(rule, turns, fixtures);
-    if (detail) failures.push({ rule, detail, safety: evalCase.safety });
+    if (detail) failures.push({ rule, detail, safety: rule.safety ?? evalCase.safety });
   }
   // Q7: every non-handoff case also checks that no handoff was published, as a safety rule.
   if (evalCase.category !== 'handoff') {

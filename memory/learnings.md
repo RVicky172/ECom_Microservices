@@ -148,3 +148,13 @@ something cost more than ~10 minutes or the fix was non-obvious. Delete entries 
 - In an npm-workspaces repo, Dependabot security-update jobs aimed at a workspace folder (`/packages/x`) fail with
   `dependency_file_not_supported`, because the lockfile is at the root. The `npm` entry on `/` covers the
   workspaces (005 T072).
+- The usage report (and any KafkaJS client) prints `TimeoutNegativeWarning: -17929… is a negative number` on Node 26.
+  It comes from KafkaJS 2.2.4's `RequestQueue.scheduleCheckPendingRequests` (seen with `node --trace-warnings`),
+  not our code; Node clamps the timer to 1 ms, so it's harmless. KafkaJS is at its latest version (012 T033).
+- `MSYS_NO_PATHCONV=1` (needed for `docker compose exec … /opt/…` in Git Bash) also stops Git Bash converting
+  `/c/…` paths passed to Windows programs such as `node`. Set it only for the docker command (012 T033).
+- Quoting a bad reply in the system prompt, even as a "don't say this", makes Qwen3-30B say it. The rule naming "I'll
+  connect you with a person, please wait" as a failure turned 1 such reply into 3 (012 T034). Describe the wanted
+  action without sample wording; in 011 T035, a sample reference in the prompt was copied too.
+- Eval runs on the local model vary by 2–5 cases between identical runs, so compare a prompt change on at least 2
+  runs against 2 baseline runs, never on one (012 T034).

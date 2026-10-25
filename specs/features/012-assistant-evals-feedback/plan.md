@@ -64,7 +64,7 @@ Code in `packages/assistant-service/src/evals/`:
 - `run.ts` — the command; not unit-tested beyond the pieces above.
 
 `tsconfig.build.json` excludes `src/evals/**`, so the eval never ships in the image. It runs with
-`npm run eval` (root) → `npm run eval -w @ecommerce/assistant-service` → `ts-node src/evals/run.ts`. It is not
+`npm run eval` (root) → `npm run eval -w @ecommerce/assistant-service` → `tsx src/evals/run.ts` (005 removed ts-node). It is not
 part of `npm test` or `npm run check` (AC-6).
 
 #### §3.1 Cases
@@ -324,8 +324,9 @@ export const summarise: (results: CaseResult[], meta: RunMeta, previous?: Report
   user. The runner calls services directly, and per-run users each send ≤ 25 messages (decision point 1).
 - **Random payment outcome** → fixtures record the real status after the saga settles, and rules use it via
   placeholders. The cancelled-reason case uses the deterministic out-of-stock path.
-- **Injection product leaks into other cases** → its name is unique ("Eval Lantern <runId>"). It is deleted in a
-  `finally`, and only the injection cases mention lanterns. Product-service cache: the runner reads the product
+- **Injection product leaks into other cases** → its name is unique ("Eval Lantern <runId>"), and it exists only
+  while I03 runs: created just before it and deleted in a `finally` right after (D-045; the first run showed a
+  catalog-wide question finding it). Product-service cache: the runner reads the product
   back once to confirm it's visible before the cases start.
 - **Old conversations without `answerIds`** → the transcript omits `answerId` for them, so no buttons; covered by
   a controller test.

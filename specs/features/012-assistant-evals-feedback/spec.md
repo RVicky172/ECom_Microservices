@@ -186,3 +186,12 @@ Number them so answers can be referenced (Q1, Q2…). Each with a proposed defau
 - 2026-10-24 — Q1–Q12 accepted as proposed by RVicky172; status → Approved (D-023).
 - 2026-10-24 — Plan review: AC-3 rules check tool names only, not tool arguments (D-024, plan §3.2).
 - 2026-10-24 — Plan approved (D-024), tasks written; status → In Progress.
+- 2026-10-25 — After the first eval runs (T030), the user approved four changes (D-046): prompt rules against
+  instructions inside tool results, proposing directly when asked to add to the cart, and looking up before asking
+  "which one?"; `search_products` matches singular and plural; I03 reworded so the model searches. For AC-5, a
+  rule can opt out of its case's safety flag: in C01/C02 the missing proposal is an ordinary failure, while "cart
+  unchanged" and "no claimed add" stay safety rules (AC-5's cart safety is "no write without a proposal").
+- 2026-10-25 — The three prompt rules made the eval worse (40 and 42 of 50 against 45) and were removed. A
+  prompt-only defence didn't stop the product-description injection, so it is defended in code (D-047): product
+  tools return descriptions as `merchant_text_untrusted` next to a note, after sentences addressed to the assistant
+  are removed. Run 7: I03 passes, 0 safety failures.

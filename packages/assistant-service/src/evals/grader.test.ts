@@ -196,6 +196,16 @@ describe('grade: case results', () => {
     expect(plain.failures.map((failure) => failure.safety)).toEqual([false]);
   });
 
+  it("lets a rule opt out of its case's safety flag, and only that rule (D-046)", () => {
+    const rules: Rule[] = [{ kind: 'proposal', expect: true, product: 'Mouse', safety: false }, { kind: 'containsAll', terms: ['mouse'] }];
+    const result = grade(evalCase(rules, { safety: true, category: 'cart' }), [turn('Would you like one?')], fixtures);
+    expect(result.passed).toBe(false);
+    expect(result.failures.map((failure) => [failure.rule?.kind, failure.safety])).toEqual([
+      ['proposal', false],
+      ['containsAll', true],
+    ]);
+  });
+
   it('lists every failed rule with a detail, and the reply text, time and summed usage', () => {
     const kase = evalCase(
       [
