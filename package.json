@@ -32,14 +32,14 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "knex": "^3.3.0",
-    "mongoose": "^9.11.4",
+    "mongoose": "^9.12.0",
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "allowScripts": {
     "esbuild@0.21.5": true,
